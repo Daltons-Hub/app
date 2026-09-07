@@ -1,0 +1,106 @@
+{
+  "project_name": "HotShot Ops",
+  "app_type": "mobile_web_app",
+  "design_archetype": "Archetype 2: The Performance Pro (Rugged Tactical Industrial)",
+  "theme": "Dark Theme (Deep Obsidian / Industrial Slate / High-Contrast Amber Gold / Safety Warning Orange)",
+  "typography": {
+    "font_family_heading": "Barlow Condensed, Chivo, Outfit, sans-serif",
+    "font_family_body": "Inter, DM Sans, system-ui, sans-serif",
+    "font_family_mono": "JetBrains Mono, Roboto Mono, monospace",
+    "font_weights": {
+      "light": 300,
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700,
+      "black": 900
+    },
+    "hierarchy": {
+      "h1": "text-3xl sm:text-4xl font-black uppercase tracking-tight text-slate-100",
+      "h2": "text-xl sm:text-2xl font-bold uppercase tracking-normal text-slate-100",
+      "h3": "text-lg sm:text-xl font-semibold text-slate-200",
+      "body": "text-base font-normal leading-relaxed text-slate-300",
+      "caption": "text-xs font-mono uppercase tracking-widest text-slate-400"
+    }
+  },
+  "colors": {
+    "background": "#0F1115",
+    "surface_dark": "#161920",
+    "surface_card": "#1E232D",
+    "surface_card_hover": "#262C38",
+    "border_subtle": "#2E3646",
+    "border_focus": "#F59E0B",
+    "primary_amber": "#F59E0B",
+    "primary_amber_hover": "#D97706",
+    "primary_amber_muted": "rgba(245, 158, 11, 0.15)",
+    "accent_orange": "#EA580C",
+    "status_active": "#10B981",
+    "status_expiring_soon": "#F59E0B",
+    "status_expired": "#EF4444",
+    "status_info": "#3B82F6",
+    "text_primary": "#F8FAFC",
+    "text_secondary": "#94A3B8",
+    "text_muted": "#64748B",
+    "forbidden_colors": [
+      "#7351B7",
+      "#1B93A4"
+    ]
+  },
+  "design_principles": [
+    "Work-glove friendly ergonomics: Touch targets minimum 48px to 64px height with tactile pressed states",
+    "One-handed highway operation: Primary action triggers positioned within easy thumb reach at the bottom on mobile",
+    "Zero jargon, high readability: Clear status badges (ACTIVE, EXPIRING SOON, EXPIRED), plain English labels for non-technical drivers",
+    "Weigh Station Mode instant clarity: Ultra high-contrast screen showing DOT#, MC#, Insurance status, IFTA badge, and Rig axle capacities in single high-impact view",
+    "Role-segmented UX: Seamless Username + 4-digit PIN role switching (Owner/Admin sees company overview & financials; Driver sees assigned rig, current trip, weigh station screen, document vault)",
+    "Rugged tactile styling: 1px subtle industrial metallic borders, dark obsidian card surfaces, amber indicator highlights, clear data density"
+  ],
+  "layout_and_spacing": {
+    "mobile_container": "max-w-md mx-auto min-h-screen bg-[#0F1115] text-slate-100 pb-24 shadow-2xl relative font-sans border-x border-slate-800/60",
+    "desktop_shell": "min-h-screen bg-[#0A0C0E] py-0 md:py-6 flex items-center justify-center",
+    "touch_padding": "p-4 sm:p-6",
+    "gap_density": "gap-4 sm:gap-6",
+    "card_radius": "rounded-xl",
+    "button_min_height": "min-h-[52px] sm:min-h-[56px]"
+  },
+  "components_guidelines": {
+    "login": "Username and 4-digit numeric keypad/PIN selector for fast role switching (Owner vs Driver)",
+    "navigation": "Sticky bottom action bar on mobile with prominent Weigh Station Mode quick-tap button",
+    "weigh_station_mode": "Full-screen overlay/mode with max brightness contrast, massive DOT & MC numbers, green active badge, emergency call/verify button",
+    "rig_profile_card": "Includes Truck (e.g. Ram 3500 Cummins Dually) + Trailer (e.g. 40ft Big Tex Gooseneck) specs: Empty Wt, Axle Wts, GVWR, GCWR, max payload capacity",
+    "document_vault": "Tabs for DOT, MC, Insurance, IFTA, Medical Card, Permits. Visual badge indicators for active (green), expiring in 30 days (amber warning banner), expired (red banner)",
+    "dashboard_guided_flow": "One-screen guided 'Next Action' card (e.g., 'Pre-trip checklist pending', '1 document expiring soon', 'Weigh station ahead ready')"
+  },
+  "image_urls": {
+    "hero_truck": "https://images.unsplash.com/photo-1648690679794-056238ad1acd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwxfHxoZWF2eSUyMGRpZXNlbCUyMGR1YWxseSUyMHBpY2t1cCUyMHRydWNrJTIwZ29vc2VuZWNrJTIwZmxhdGJlZCUyMHRyYWlsZXJ8ZW58MHx8fHwxNzg4NzYxMjg2fDA&ixlib=rb-4.1.0&q=85",
+    "weigh_station_bg": "https://images.unsplash.com/photo-1565793298595-6a879b1d9492?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxoaWdod2F5JTIwdHJ1Y2slMjB3ZWlnaCUyMHN0YXRpb24lMjBzY2FsZSUyMGhvdXNlJTIwZG90JTIwaW5zcGVjdGlvbnxlbnwwfHx8fDE3ODg3NjEyODZ8MA&ixlib=rb-4.1.0&q=85",
+    "highway_cargo": "https://images.unsplash.com/photo-1785761607942-c0f9d41a74e0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHszfHx0cnVjayUyMGNhcmdvJTIwaGlnaHdheXxlbnwwfHx8fDE3ODg3NjEyOTV8MA&ixlib=rb-4.1.0&q=85",
+    "fleet_parking": "https://images.unsplash.com/photo-1682033239487-30f076c82232?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwxfHx0cnVjayUyMGNhcmdvJTIwaGlnaHdheXxlbnwwfHx8fDE3ODg3NjEyOTV8MA&ixlib=rb-4.1.0&q=85"
+  },
+  "testing_requirements": {
+    "mandatory_attribute": "data-testid",
+    "convention": "kebab-case, role-based descriptors",
+    "examples": [
+      "login-username-input",
+      "login-pin-input",
+      "login-submit-button",
+      "role-switcher-owner",
+      "role-switcher-driver",
+      "weigh-station-toggle-button",
+      "weigh-station-dot-number",
+      "weigh-station-mc-number",
+      "rig-profile-card-1",
+      "doc-vault-upload-button",
+      "doc-expiration-badge"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure all interactive elements have data-testid attributes.",
+    "Build strictly mobile-first design with high-contrast, work-glove-friendly button sizes (min-h-[52px]).",
+    "Implement Simple Username + PIN authentication supporting two roles: 'Owner/Admin' and 'Driver/Employee'.",
+    "Owner role sees full dashboard including financials, all rigs, full doc vault, driver assignments.",
+    "Driver role sees assigned rig specs, current active trip, Weigh Station Mode, and Document Vault without financial figures.",
+    "Weigh Station Mode must be a zero-latency one-tap full screen view displaying USDOT#, MC#, Insurance status, IFTA badge, and Truck+Trailer Axle Wt limits clearly.",
+    "Use Lucide icons and Sonner toasts for clear visual feedback.",
+    "Use Shadcn components customized with dark tactical styling (slate-900 backgrounds, amber-500 borders/accents)."
+  ]
+}
