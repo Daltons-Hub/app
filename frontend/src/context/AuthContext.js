@@ -8,27 +8,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("hs_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     api
       .get("/auth/me")
       .then((r) => setUser(r.data))
-      .catch(() => localStorage.removeItem("hs_token"))
+      .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (username, pin) => {
     const { data } = await api.post("/auth/login", { username, pin });
-    localStorage.setItem("hs_token", data.token);
     setUser(data.user);
     return data.user;
   };
 
-  const logout = () => {
-    localStorage.removeItem("hs_token");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {
+      /* ignore */
+    }
     setUser(null);
   };
 

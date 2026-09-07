@@ -2,17 +2,10 @@ import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-export const api = axios.create({ baseURL: API });
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("hs_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+export const api = axios.create({ baseURL: API, withCredentials: true });
 
 export function fileUrl(fileId) {
-  const token = localStorage.getItem("hs_token");
-  return `${API}/files/${fileId}?auth=${token}`;
+  return `${API}/files/${fileId}`;
 }
 
 export function apiError(e) {

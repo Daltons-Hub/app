@@ -5,7 +5,7 @@ import os
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Header, Query, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Header, Query, Response, Request
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import logging
@@ -93,10 +93,15 @@ def create_token(user_id: str, role: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_user(authorization: str = Header(None)) -> dict:
-    if not authorization or not authorization.startswith("Bearer "):
+COOKIE_MAX_AGE = 30 * 24 * 3600
+
+
+async def get_current_user(request: Request, authorization: str = Header(None)) -> dict:
+    token = request.cookies.get("access_token")
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+    if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    token = authorization[7:]
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
@@ -170,19 +175,27 @@ def doc_status(expiration_date: Optional[str]) -> str:
 
 
 @api_router.post("/auth/login")
-async def login(data: LoginInput):
+async def login(data: LoginInput, response: Response):
     user = await db.users.find_one({"username": data.username.lower().strip()})
     if not user or not verify_pin(data.pin, user["pin_hash"]):
         raise HTTPException(status_code=401, detail="Wrong username or PIN.")
     token = create_token(user["id"], user["role"])
     user.pop("_id", None)
     user.pop("pin_hash", None)
+    response.set_cookie("access_token", token, httponly=True, secure=True,
+                        samesite="none", max_age=COOKIE_MAX_AGE, path="/")
     return {"token": token, "user": user}
 
 
 @api_router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    return {"ok": True}
 
 
 @api_router.get("/rigs")
@@ -271,8 +284,8 @@ async def upload(file: UploadFile = File(...), user: dict = Depends(get_current_
 
 
 @api_router.get("/files/{file_id}")
-async def download(file_id: str, auth: str = Query(None), authorization: str = Header(None)):
-    token = auth or (authorization[7:] if authorization and authorization.startswith("Bearer ") else None)
+async def download(file_id: str, request: Request, auth: str = Query(None), authorization: str = Header(None)):
+    token = auth or request.cookies.get("access_token") or (authorization[7:] if authorization and authorization.startswith("Bearer ") else None)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -358,6 +371,8 @@ async def dashboard(user: dict = Depends(get_current_user)):
         driver_count = 0
         my_rig = await db.rigs.find_one({"id": user.get("assigned_rig_id")}, {"_id": 0}) if user.get("assigned_rig_id") else None
 
+    next_step = {"level": "good", "title": "You're road-ready",
+                 "detail": "All documents are current. Tap Weigh Station when you pull in.", "action": "weigh"}
     if expired:
         next_step = {"level": "expired", "title": f"{len(expired)} document(s) EXPIRED",
                      "detail": ", ".join(expired) + " — renew before your next haul.", "action": "documents"}
@@ -486,6 +501,8 @@ def compute_compliance(rig, cargo_weight):
     if trailer_capacity and cargo_weight > trailer_capacity:
         warnings.append(f"Cargo ({int(cargo_weight):,} lb) is over the trailer's rated capacity ({int(trailer_capacity):,} lb).")
 
+    tier = ""
+    summary = ""
     if not is_cmv:
         tier = "Light / non-CMV"
         summary = "This load is under 10,001 lb — outside most federal FMCSA requirements."
@@ -1069,6 +1086,7 @@ async def assistant_chat(data: AssistantInput, user: dict = Depends(get_current_
 
     chat = LlmChat(api_key=EMERGENT_KEY, session_id=f"assistant-{user['id']}",
                    system_message=system).with_model("gemini", "gemini-3-flash-preview")
+    answer = ""
     try:
         answer = await chat.send_message(UserMessage(text=data.message))
     except Exception as e:

@@ -1,0 +1,40 @@
+{
+  "summary": "Bug-fix verification run: (1) SECURITY migration to httpOnly cookies and (2) undefined-variable hardening. Backend: 12/12 new cookie/security tests PASS in /app/backend/tests/test_cookie_auth.py — login sets access_token cookie with HttpOnly+Secure+SameSite=None, /auth/me works via cookie-only (no Authorization header), 401 without any auth, Bearer fallback still works (legacy pytest suites pass), /auth/logout clears the cookie and subsequent /auth/me returns 401, /api/upload + /api/files/{id} authenticates via cookie only (no ?auth= needed) and 401s without any auth. Undefined-var fixes verified: /api/dashboard always returns next_step dict; /api/compliance always returns tier + summary strings for light/mid/heavy cargo (5k/12k/25k lb); /api/assistant/chat always returns answer string. Full regression 40/40 pytest passing (backend_test.py + test_phase2.py + test_phase3.py — Phase4 not re-run to save LLM credits, was 11/11 in prev iteration and Bearer path unchanged). Frontend (mobile 390x844): Owner login owner/1910 -> dashboard renders, localStorage contains NO JWT (only PostHog telemetry) — hs_token gone, access_token cookie is HttpOnly (invisible to document.cookie in JS) with Secure+SameSite=None, session persists across full page reload (cookie hydration via GET /api/auth/me), logout-button clears the cookie and redirects /rigs -> /login. Driver login driver/1234 succeeds, no JWT in localStorage, /office redirects to / (owner-only gate intact), no Office tab in bottom nav.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cookie_auth.py",
+    "/app/test_reports/pytest/cookie_auth.xml",
+    "/app/test_reports/pytest/regression.xml",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_phase2.py",
+    "/app/backend/tests/test_phase3.py",
+    "/app/backend/tests/test_phase4.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py sets samesite='none' + secure=True which is required for iframe embedding (Emergent preview) — correct, but note this means the cookie is sent cross-site to any request; combined with credentials:'include' on the axios client + backend CORS this is fine. Ensure CORS Access-Control-Allow-Origin is echoed (not '*') when credentials are allowed — a quick grep of server.py should confirm.",
+    "Login also still returns the raw token in the JSON body (for Bearer legacy). Long-term, once no clients need Bearer, drop the token from the response body so it can never be captured client-side.",
+    "There is no CSRF protection on state-changing endpoints now that the browser auto-sends the cookie. Recommend adding a double-submit CSRF header or SameSite=Strict when not embedded in iframe. Since SameSite=None was chosen for iframe compatibility, at minimum add a custom header check (e.g., require X-Requested-With: XMLHttpRequest) on mutating routes.",
+    "AuthContext initial /auth/me on mount uses the cookie fine, but there is no 401 interceptor to force logout on token expiry — user could be silently unauthenticated for the app UI still shows their name. Consider an axios response interceptor that clears user state on 401.",
+    "fileUrl in lib/api.js now returns a bare /files/{id} URL — <img> tags will include cookies because the API is same-origin as the frontend within the preview; ensure this remains true in production deployment (must be first-party) or file previews will break.",
+    "cookie max-age is 30d but JWT itself may have a shorter exp — verify JWT exp matches or exceeds COOKIE_MAX_AGE, otherwise users get a cookie that server rejects."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cookie_auth.py (new — 12 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 new cookie-auth + 40/40 phase1-3 regression, Bearer path unchanged so phase4 unaffected)",
+    "frontend": "100% (owner login/reload-persist/logout, driver login, no-JWT-in-localStorage, httpOnly cookie flags verified, /office role gate)"
+  },
+  "test_credentials": "owner/1910, driver/1234",
+  "seed_data_creation": "Owner uploaded one throwaway text file during test_file_download_auth_via_cookie; file lives in DB but is 5 bytes and harmless.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Cookie-auth regression file: /app/backend/tests/test_cookie_auth.py (JUnit at /app/test_reports/pytest/cookie_auth.xml). Key browser check: after login, page.context.cookies() must show access_token with httpOnly=True, secure=True, sameSite='None', AND document.cookie in JS must NOT contain access_token. localStorage may legitimately contain PostHog analytics keys (ph_phc_*_posthog) — filter those out; only assert on JWT-like values ('eyJ' prefix) or keys named token/hs_token/access_token/jwt. Login flow uses numeric keypad: fill [data-testid=login-username-input] then click [data-testid=login-key-{d}] for each digit of PIN. Logout: [data-testid=logout-button].",
+  "rca of the issue": "No blocking issues. Security migration to httpOnly cookies is correctly implemented end-to-end and legacy Bearer path still works so all prior pytest suites remain green. Recommend the main agent consider CSRF protection and a 401 axios interceptor as follow-ups (see critical_code_review_comments)."
+}
