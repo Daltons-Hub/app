@@ -32,10 +32,13 @@ Phase 1 Core → Phase 2 Trip logic → Phase 3 Back office → Phase 4 AI Assis
 - Load Securement Checklist: chains vs straps, 50% aggregate-WLL rule, length-based min tie-down count, editable pre-trip checklist.
 - Trip logging: start/stop, duty status, mileage by state, total miles, trip history.
 - Active-rig picker (owner) powers Weigh Station; sample data (Big Blue rig + 5 docs + demo driver assigned) via one-time seed flag.
-### Phase 3 — Back office (P0, next)
-- Delivery/POD (photo + signature → invoice), Maintenance Tracker (per-truck schedule tied to mileage w/ due alerts), Expense tracking + IFTA mileage-by-state report.
-### Phase 4 — AI Assistant (P1, only if credits remain)
-- Gemini 3 Flash chat over stored app data.
+### Phase 3 — Back office ✅ (2026-06, tested 13/13 + 27/27 regression)
+- Delivery/POD (owner): capture customer/load/rate + POD photo + drawn signature → auto-generated invoice (atomic sequential INV-YYYY-####), view invoice with photo/signature, toggle Paid/Unpaid, delete.
+- Maintenance Tracker (owner): per-rig service items (oil/DEF/tires/DOT inspection) by mileage and/or days; editable + trip-synced odometer; OK/DUE SOON/OVERDUE status; Mark Serviced.
+- Expenses + IFTA (owner): categorized Fuel/Toll/Repair/DEF/Other (fuel captures gallons + state); IFTA report aggregates completed-trip mileage-by-state + fuel gallons-by-state → per-state table w/ total miles, gallons, fleet MPG.
+- Owner nav adds an 'Office' hub; all Phase 3 routes owner-only (driver gets 403, no Office nav).
+### Phase 4 — AI Assistant (P0, next — only if credits remain)
+- Gemini 3 Flash chat over stored app data (compliance, margin, maintenance questions).
 
 ## Notes / Known minor items
 - Owner weigh-station currently uses first rig (no active-rig selector yet).

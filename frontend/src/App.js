@@ -11,6 +11,10 @@ import WeighStation from "@/pages/WeighStation";
 import Drivers from "@/pages/Drivers";
 import Tools from "@/pages/Tools";
 import Trip from "@/pages/Trip";
+import Office from "@/pages/Office";
+import Deliveries from "@/pages/Deliveries";
+import Maintenance from "@/pages/Maintenance";
+import Expenses from "@/pages/Expenses";
 
 function Protected({ children, ownerOnly }) {
   const { user, loading, isOwner } = useAuth();
@@ -36,6 +40,10 @@ function App() {
             <Route path="/documents" element={<Protected><Shell><Documents /></Shell></Protected>} />
             <Route path="/tools" element={<Protected><Shell><Tools /></Shell></Protected>} />
             <Route path="/trip" element={<Protected><Shell><Trip /></Shell></Protected>} />
+            <Route path="/office" element={<Protected ownerOnly><Shell><Office /></Shell></Protected>} />
+            <Route path="/deliveries" element={<Protected ownerOnly><Shell><Deliveries /></Shell></Protected>} />
+            <Route path="/maintenance" element={<Protected ownerOnly><Shell><Maintenance /></Shell></Protected>} />
+            <Route path="/expenses" element={<Protected ownerOnly><Shell><Expenses /></Shell></Protected>} />
             <Route path="/drivers" element={<Protected ownerOnly><Shell><Drivers /></Shell></Protected>} />
             <Route path="/weigh-station" element={<Protected><WeighStation /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />

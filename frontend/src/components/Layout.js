@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Truck, FolderLock, Users, LogOut, ScanLine, Route, Calculator } from "lucide-react";
+import { Home, Truck, FolderLock, Users, LogOut, ScanLine, Route, Calculator, Briefcase } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function Layout({ children }) {
@@ -12,7 +12,7 @@ export function Layout({ children }) {
         { to: "/", icon: Home, label: "Home", testId: "nav-home" },
         { to: "/rigs", icon: Truck, label: "Rigs", testId: "nav-rigs" },
         { to: "/trip", icon: Route, label: "Trip", testId: "nav-trip" },
-        { to: "/tools", icon: Calculator, label: "Tools", testId: "nav-tools" },
+        { to: "/office", icon: Briefcase, label: "Office", testId: "nav-office" },
         { to: "/documents", icon: FolderLock, label: "Docs", testId: "nav-documents" },
       ]
     : [

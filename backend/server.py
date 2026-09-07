@@ -17,6 +17,7 @@ import bcrypt
 import jwt
 import requests
 import math
+from pymongo import ReturnDocument
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -678,6 +679,10 @@ async def stop_trip(trip_id: str, data: TripStop, user: dict = Depends(get_curre
     await db.trips.update_one({"id": trip_id},
                               {"$set": {"status": "completed", "end_time": now, "end_odometer": data.end_odometer,
                                         "total_miles": total, "duty_status": "off_duty", "notes": data.notes}})
+    if data.end_odometer is not None and t.get("rig_id"):
+        rig = await db.rigs.find_one({"id": t["rig_id"]})
+        if rig and (rig.get("current_odometer") or 0) < data.end_odometer:
+            await db.rigs.update_one({"id": t["rig_id"]}, {"$set": {"current_odometer": data.end_odometer}})
     return await db.trips.find_one({"id": trip_id}, {"_id": 0})
 
 
@@ -693,6 +698,272 @@ async def list_trips(user: dict = Depends(get_current_user)):
 async def set_active_rig(data: ActiveRigInput, user: dict = Depends(require_owner)):
     await db.users.update_one({"id": user["id"]}, {"$set": {"active_rig_id": data.rig_id}})
     return {"active_rig_id": data.rig_id}
+
+
+# ===================== Phase 3: Back office =====================
+
+class DeliveryInput(BaseModel):
+    customer_name: str
+    rig_id: Optional[str] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    load_description: Optional[str] = None
+    delivery_date: Optional[str] = None
+    weight: Optional[float] = None
+    rate_amount: Optional[float] = None
+    photo_file_id: Optional[str] = None
+    signature_file_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class InvoiceUpdate(BaseModel):
+    rate_amount: Optional[float] = None
+    invoice_status: Optional[str] = None
+
+
+class MaintenanceInput(BaseModel):
+    rig_id: str
+    type: str
+    interval_miles: Optional[float] = None
+    interval_days: Optional[int] = None
+    last_done_miles: Optional[float] = None
+    last_done_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class OdometerInput(BaseModel):
+    current_odometer: float
+
+
+class ExpenseInput(BaseModel):
+    rig_id: Optional[str] = None
+    category: str
+    amount: float
+    gallons: Optional[float] = None
+    state: Optional[str] = None
+    date: Optional[str] = None
+    vendor: Optional[str] = None
+    notes: Optional[str] = None
+
+
+def _parse_date(s):
+    try:
+        return datetime.fromisoformat(s).date()
+    except (ValueError, TypeError):
+        return None
+
+
+def compute_maint(item, current_odo):
+    today = datetime.now(timezone.utc).date()
+    order = {"ok": 0, "due_soon": 1, "overdue": 2}
+    status = "ok"
+    out = {"next_due_miles": None, "miles_remaining": None, "next_due_date": None, "days_remaining": None}
+    if item.get("interval_miles") and item.get("last_done_miles") is not None:
+        nd = item["last_done_miles"] + item["interval_miles"]
+        rem = nd - (current_odo or 0)
+        s = "overdue" if rem <= 0 else ("due_soon" if rem <= 500 else "ok")
+        if order[s] > order[status]:
+            status = s
+        out["next_due_miles"] = nd
+        out["miles_remaining"] = rem
+    if item.get("interval_days") and item.get("last_done_date"):
+        d = _parse_date(item["last_done_date"])
+        if d:
+            nd = d + timedelta(days=item["interval_days"])
+            days_left = (nd - today).days
+            s = "overdue" if days_left <= 0 else ("due_soon" if days_left <= 30 else "ok")
+            if order[s] > order[status]:
+                status = s
+            out["next_due_date"] = nd.isoformat()
+            out["days_remaining"] = days_left
+    out["status"] = status
+    return out
+
+
+# ---------- Deliveries / Invoices ----------
+@api_router.post("/deliveries")
+async def create_delivery(data: DeliveryInput, user: dict = Depends(require_owner)):
+    now = datetime.now(timezone.utc)
+    counter = await db.counters.find_one_and_update(
+        {"_id": "invoice"}, {"$inc": {"seq": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
+    seq = counter["seq"]
+    doc = data.model_dump()
+    doc.update({
+        "id": str(uuid.uuid4()),
+        "invoice_number": f"INV-{now.year}-{seq:04d}",
+        "invoice_status": "unpaid",
+        "created_at": now.isoformat(),
+    })
+    rig = await db.rigs.find_one({"id": data.rig_id}, {"_id": 0}) if data.rig_id else None
+    doc["rig_name"] = rig.get("name") if rig else None
+    await db.deliveries.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/deliveries")
+async def list_deliveries(user: dict = Depends(require_owner)):
+    items = await db.deliveries.find({}, {"_id": 0}).to_list(1000)
+    items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return items
+
+
+@api_router.put("/deliveries/{delivery_id}/invoice")
+async def update_invoice(delivery_id: str, data: InvoiceUpdate, user: dict = Depends(require_owner)):
+    upd = {k: v for k, v in data.model_dump().items() if v is not None}
+    res = await db.deliveries.update_one({"id": delivery_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+    return await db.deliveries.find_one({"id": delivery_id}, {"_id": 0})
+
+
+@api_router.delete("/deliveries/{delivery_id}")
+async def delete_delivery(delivery_id: str, user: dict = Depends(require_owner)):
+    await db.deliveries.delete_one({"id": delivery_id})
+    return {"ok": True}
+
+
+# ---------- Maintenance ----------
+@api_router.get("/maintenance")
+async def list_maintenance(user: dict = Depends(require_owner)):
+    rigs = {r["id"]: r for r in await db.rigs.find({}, {"_id": 0}).to_list(1000)}
+    items = await db.maintenance.find({}, {"_id": 0}).to_list(1000)
+    out = []
+    for it in items:
+        rig = rigs.get(it.get("rig_id"))
+        current_odo = (rig.get("current_odometer") if rig else None) or 0
+        it = {**it, **compute_maint(it, current_odo), "rig_name": rig.get("name") if rig else None,
+              "current_odometer": current_odo}
+        out.append(it)
+    order = {"overdue": 0, "due_soon": 1, "ok": 2}
+    out.sort(key=lambda x: order.get(x["status"], 3))
+    return out
+
+
+@api_router.post("/maintenance")
+async def create_maintenance(data: MaintenanceInput, user: dict = Depends(require_owner)):
+    doc = data.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    await db.maintenance.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/maintenance/{item_id}/service")
+async def service_maintenance(item_id: str, user: dict = Depends(require_owner)):
+    it = await db.maintenance.find_one({"id": item_id})
+    if not it:
+        raise HTTPException(status_code=404, detail="Item not found")
+    rig = await db.rigs.find_one({"id": it.get("rig_id")})
+    current_odo = (rig.get("current_odometer") if rig else None) or 0
+    await db.maintenance.update_one({"id": item_id}, {"$set": {
+        "last_done_miles": current_odo,
+        "last_done_date": datetime.now(timezone.utc).date().isoformat(),
+    }})
+    return await db.maintenance.find_one({"id": item_id}, {"_id": 0})
+
+
+@api_router.delete("/maintenance/{item_id}")
+async def delete_maintenance(item_id: str, user: dict = Depends(require_owner)):
+    await db.maintenance.delete_one({"id": item_id})
+    return {"ok": True}
+
+
+@api_router.put("/rigs/{rig_id}/odometer")
+async def set_odometer(rig_id: str, data: OdometerInput, user: dict = Depends(require_owner)):
+    res = await db.rigs.update_one({"id": rig_id}, {"$set": {"current_odometer": data.current_odometer}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Rig not found")
+    return {"current_odometer": data.current_odometer}
+
+
+# ---------- Expenses ----------
+@api_router.get("/expenses")
+async def list_expenses(user: dict = Depends(require_owner)):
+    items = await db.expenses.find({}, {"_id": 0}).to_list(2000)
+    items.sort(key=lambda x: x.get("date") or x.get("created_at") or "", reverse=True)
+    return items
+
+
+@api_router.post("/expenses")
+async def create_expense(data: ExpenseInput, user: dict = Depends(require_owner)):
+    doc = data.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    if not doc.get("date"):
+        doc["date"] = datetime.now(timezone.utc).date().isoformat()
+    await db.expenses.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/expenses/{expense_id}")
+async def delete_expense(expense_id: str, user: dict = Depends(require_owner)):
+    await db.expenses.delete_one({"id": expense_id})
+    return {"ok": True}
+
+
+@api_router.get("/ifta-report")
+async def ifta_report(user: dict = Depends(require_owner)):
+    trips = await db.trips.find({"status": "completed"}, {"_id": 0}).to_list(2000)
+    miles_by_state = {}
+    for t in trips:
+        for e in t.get("state_miles", []):
+            miles_by_state[e["state"]] = miles_by_state.get(e["state"], 0) + (e.get("miles") or 0)
+
+    expenses = await db.expenses.find({"category": "Fuel"}, {"_id": 0}).to_list(2000)
+    gallons_by_state = {}
+    fuel_by_state = {}
+    for x in expenses:
+        st = x.get("state") or "—"
+        gallons_by_state[st] = gallons_by_state.get(st, 0) + (x.get("gallons") or 0)
+        fuel_by_state[st] = fuel_by_state.get(st, 0) + (x.get("amount") or 0)
+
+    states = sorted(set(list(miles_by_state.keys()) + [s for s in gallons_by_state if s != "—"]))
+    rows = [{
+        "state": s,
+        "miles": round(miles_by_state.get(s, 0), 1),
+        "gallons": round(gallons_by_state.get(s, 0), 1),
+        "fuel_cost": round(fuel_by_state.get(s, 0), 2),
+    } for s in states]
+
+    total_miles = round(sum(miles_by_state.values()), 1)
+    total_gallons = round(sum(gallons_by_state.values()), 1)
+    return {
+        "rows": rows,
+        "total_miles": total_miles,
+        "total_gallons": total_gallons,
+        "avg_mpg": round(total_miles / total_gallons, 2) if total_gallons else None,
+        "total_fuel_cost": round(sum(fuel_by_state.values()), 2),
+    }
+
+
+@api_router.get("/office/summary")
+async def office_summary(user: dict = Depends(require_owner)):
+    deliveries = await db.deliveries.find({}, {"_id": 0}).to_list(2000)
+    unpaid = [d for d in deliveries if d.get("invoice_status") != "paid"]
+    unpaid_total = sum((d.get("rate_amount") or 0) for d in unpaid)
+
+    rigs = {r["id"]: r for r in await db.rigs.find({}, {"_id": 0}).to_list(1000)}
+    maint = await db.maintenance.find({}, {"_id": 0}).to_list(1000)
+    due = 0
+    for it in maint:
+        rig = rigs.get(it.get("rig_id"))
+        current_odo = (rig.get("current_odometer") if rig else None) or 0
+        if compute_maint(it, current_odo)["status"] in ("overdue", "due_soon"):
+            due += 1
+
+    expenses = await db.expenses.find({}, {"_id": 0}).to_list(2000)
+    expense_total = sum((x.get("amount") or 0) for x in expenses)
+
+    return {
+        "deliveries_count": len(deliveries),
+        "unpaid_count": len(unpaid),
+        "unpaid_total": round(unpaid_total, 2),
+        "maintenance_due": due,
+        "expense_total": round(expense_total, 2),
+    }
 
 
 async def seed():
