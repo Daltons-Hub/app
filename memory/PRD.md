@@ -37,8 +37,10 @@ Phase 1 Core → Phase 2 Trip logic → Phase 3 Back office → Phase 4 AI Assis
 - Maintenance Tracker (owner): per-rig service items (oil/DEF/tires/DOT inspection) by mileage and/or days; editable + trip-synced odometer; OK/DUE SOON/OVERDUE status; Mark Serviced.
 - Expenses + IFTA (owner): categorized Fuel/Toll/Repair/DEF/Other (fuel captures gallons + state); IFTA report aggregates completed-trip mileage-by-state + fuel gallons-by-state → per-state table w/ total miles, gallons, fleet MPG.
 - Owner nav adds an 'Office' hub; all Phase 3 routes owner-only (driver gets 403, no Office nav).
-### Phase 4 — AI Assistant (P0, next — only if credits remain)
-- Gemini 3 Flash chat over stored app data (compliance, margin, maintenance questions).
+### Phase 4 — AI Assistant ✅ (2026-06, tested 11/11 + 40/40 regression — ALL 4 PHASES COMPLETE)
+- Full-screen chat (Gemini 3 Flash via emergentintegrations + EMERGENT_LLM_KEY) that answers from the app's own data: rigs, credential/weigh-station status, trips, maintenance, and (owner only) invoices/expenses.
+- Role-aware: driver never receives financial data — enforced in context (financials excluded), system prompt, AND a server-side dollar-figure strip on driver replies. Verified refusal.
+- Persistent per-user history (db.assistant_messages), clear button, suggested-question chips. Entry via header Sparkles + dashboard card; reachable by both roles.
 
 ## Notes / Known minor items
 - Owner weigh-station currently uses first rig (no active-rig selector yet).

@@ -15,6 +15,7 @@ import Office from "@/pages/Office";
 import Deliveries from "@/pages/Deliveries";
 import Maintenance from "@/pages/Maintenance";
 import Expenses from "@/pages/Expenses";
+import Assistant from "@/pages/Assistant";
 
 function Protected({ children, ownerOnly }) {
   const { user, loading, isOwner } = useAuth();
@@ -46,6 +47,7 @@ function App() {
             <Route path="/expenses" element={<Protected ownerOnly><Shell><Expenses /></Shell></Protected>} />
             <Route path="/drivers" element={<Protected ownerOnly><Shell><Drivers /></Shell></Protected>} />
             <Route path="/weigh-station" element={<Protected><WeighStation /></Protected>} />
+            <Route path="/assistant" element={<Protected><Assistant /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

@@ -17,7 +17,10 @@ import bcrypt
 import jwt
 import requests
 import math
+import json
+import re
 from pymongo import ReturnDocument
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -964,6 +967,124 @@ async def office_summary(user: dict = Depends(require_owner)):
         "maintenance_due": due,
         "expense_total": round(expense_total, 2),
     }
+
+
+# ===================== Phase 4: AI Assistant =====================
+
+class AssistantInput(BaseModel):
+    message: str
+
+
+async def build_assistant_context(user):
+    is_owner = user["role"] == "owner"
+    ctx = {
+        "role": user["role"],
+        "user_name": user.get("name"),
+        "today": datetime.now(timezone.utc).date().isoformat(),
+    }
+
+    if is_owner:
+        rigs = await db.rigs.find({}, {"_id": 0}).to_list(100)
+    else:
+        rigs = await db.rigs.find({"id": user.get("assigned_rig_id")}, {"_id": 0}).to_list(10) if user.get("assigned_rig_id") else []
+    ctx["rigs"] = rigs
+
+    docs = await db.documents.find({}, {"_id": 0}).to_list(1000)
+    ctx["credentials"] = [{"category": d.get("category"), "label": d.get("label"), "number": d.get("number"),
+                           "expiration_date": d.get("expiration_date"), "status": doc_status(d.get("expiration_date"))}
+                          for d in docs]
+
+    tq = {} if is_owner else {"user_id": user["id"]}
+    trips = await db.trips.find(tq, {"_id": 0}).to_list(300)
+    active = [t for t in trips if t.get("status") == "active"]
+    completed = sorted([t for t in trips if t.get("status") == "completed"],
+                       key=lambda x: x.get("created_at") or "", reverse=True)[:5]
+    ctx["active_trip"] = ({"rig_name": active[0].get("rig_name"), "duty_status": active[0].get("duty_status"),
+                           "origin": active[0].get("origin"), "state_miles": active[0].get("state_miles")}
+                          if active else None)
+    ctx["recent_trips"] = [{"rig_name": t.get("rig_name"), "start_time": t.get("start_time"),
+                            "total_miles": t.get("total_miles"), "state_miles": t.get("state_miles")} for t in completed]
+
+    rigmap = {r["id"]: r for r in rigs}
+    maint = await db.maintenance.find({"rig_id": {"$in": list(rigmap.keys())}}, {"_id": 0}).to_list(500) if rigmap else []
+    ctx["maintenance"] = []
+    for it in maint:
+        odo = (rigmap.get(it["rig_id"], {}).get("current_odometer")) or 0
+        cm = compute_maint(it, odo)
+        ctx["maintenance"].append({"type": it.get("type"), "rig": rigmap.get(it["rig_id"], {}).get("name"),
+                                   "status": cm["status"], "next_due_miles": cm["next_due_miles"],
+                                   "miles_remaining": cm["miles_remaining"], "next_due_date": cm["next_due_date"],
+                                   "current_odometer": odo})
+
+    if is_owner:
+        deliveries = await db.deliveries.find({}, {"_id": 0}).to_list(500)
+        deliveries.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        unpaid = [d for d in deliveries if d.get("invoice_status") != "paid"]
+        expenses = await db.expenses.find({}, {"_id": 0}).to_list(1000)
+        ctx["financials"] = {
+            "unpaid_invoice_count": len(unpaid),
+            "unpaid_total": round(sum((d.get("rate_amount") or 0) for d in unpaid), 2),
+            "recent_invoices": [{"invoice_number": d.get("invoice_number"), "customer": d.get("customer_name"),
+                                 "amount": d.get("rate_amount"), "status": d.get("invoice_status")} for d in deliveries[:8]],
+            "expense_total": round(sum((x.get("amount") or 0) for x in expenses), 2),
+            "note": "Per-load margin is not stored. To estimate margin, use cost = fuel + DEF (~3% of fuel) + wear (~$0.18/mi); ask the user for distance, fuel price and MPG if needed.",
+        }
+    return ctx
+
+
+ASSISTANT_RULES = (
+    "You are the HotShot Ops Assistant — a plain-spoken helper for a hotshot trucking operator. "
+    "Answer ONLY from the DATA provided below. Keep answers short, friendly and jargon-free (the user may be a non-technical driver). "
+    "Use plain numbers (e.g. '2,400 miles left'). If the data doesn't contain the answer, say so honestly and suggest what to add in the app. "
+    "For weigh-station / 'am I clear' questions, check the credentials: a credential is a problem if its status is 'expired' or 'missing'; 'expiring' means renew soon but still valid. "
+    "IMPORTANT: If the user's role is 'driver', NEVER reveal or discuss any financial information (rates, invoices, margins, expenses, money). If a driver asks about money, say that's only available to the owner. "
+    "Never invent numbers that aren't in the data."
+)
+
+
+@api_router.get("/assistant/history")
+async def assistant_history(user: dict = Depends(get_current_user)):
+    msgs = await db.assistant_messages.find({"user_id": user["id"]}, {"_id": 0}).to_list(300)
+    msgs.sort(key=lambda m: m.get("created_at") or "")
+    return msgs
+
+
+@api_router.delete("/assistant/history")
+async def clear_assistant_history(user: dict = Depends(get_current_user)):
+    await db.assistant_messages.delete_many({"user_id": user["id"]})
+    return {"ok": True}
+
+
+@api_router.post("/assistant/chat")
+async def assistant_chat(data: AssistantInput, user: dict = Depends(get_current_user)):
+    ctx = await build_assistant_context(user)
+    prev = await db.assistant_messages.find({"user_id": user["id"]}, {"_id": 0}).to_list(300)
+    prev.sort(key=lambda m: m.get("created_at") or "")
+    recent = prev[-8:]
+    convo = "\n".join(f"{m['role'].upper()}: {m['text']}" for m in recent)
+
+    system = ASSISTANT_RULES + "\n\nDATA (JSON):\n" + json.dumps(ctx, default=str)
+    if convo:
+        system += "\n\nRECENT CONVERSATION:\n" + convo
+
+    chat = LlmChat(api_key=EMERGENT_KEY, session_id=f"assistant-{user['id']}",
+                   system_message=system).with_model("gemini", "gemini-3-flash-preview")
+    try:
+        answer = await chat.send_message(UserMessage(text=data.message))
+    except Exception as e:
+        logger.error(f"Assistant error: {e}")
+        raise HTTPException(status_code=502, detail="The assistant is unavailable right now. Please try again.")
+
+    # Belt-and-braces: never let a dollar figure reach a driver
+    if user["role"] == "driver" and re.search(r"\$\s?\d", answer or ""):
+        answer = "That information is only available to the owner. Check with them for anything about money."
+
+    now = datetime.now(timezone.utc)
+    await db.assistant_messages.insert_one({"id": str(uuid.uuid4()), "user_id": user["id"], "role": "user",
+                                            "text": data.message, "created_at": now.isoformat()})
+    await db.assistant_messages.insert_one({"id": str(uuid.uuid4()), "user_id": user["id"], "role": "assistant",
+                                            "text": answer, "created_at": datetime.now(timezone.utc).isoformat()})
+    return {"answer": answer}
 
 
 async def seed():

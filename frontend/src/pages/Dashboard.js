@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Truck, FolderLock, ScanLine, ArrowRight, CheckCircle2, AlertTriangle, XCircle, Info, Route, Scale, DollarSign, ClipboardCheck, Users } from "lucide-react";
+import { Truck, FolderLock, ScanLine, ArrowRight, CheckCircle2, AlertTriangle, XCircle, Info, Route, Scale, DollarSign, ClipboardCheck, Users, Sparkles } from "lucide-react";
 
 const LEVELS = {
   good: { cls: "border-emerald-500/50 bg-emerald-500/10", Icon: CheckCircle2, color: "text-emerald-400" },
@@ -80,6 +80,16 @@ export default function Dashboard() {
       )}
 
       {/* Tools quick actions */}
+      <button data-testid="dashboard-assistant" onClick={() => nav("/assistant")}
+        className="w-full rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 flex items-center gap-3 active:scale-[0.99] transition-transform">
+        <Sparkles className="w-6 h-6 text-amber-500" />
+        <div className="text-left flex-1">
+          <div className="font-display font-bold text-lg leading-tight">Ask the Assistant</div>
+          <div className="text-slate-400 text-sm">Questions about your rig, paperwork or loads</div>
+        </div>
+        <ArrowRight className="w-5 h-5 text-slate-400" />
+      </button>
+
       <div>
         <div className="text-xs font-mono-num uppercase tracking-widest text-slate-400 mb-2">Quick tools</div>
         <div className="grid grid-cols-3 gap-3">

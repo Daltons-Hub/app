@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Truck, FolderLock, Users, LogOut, ScanLine, Route, Calculator, Briefcase } from "lucide-react";
+import { Home, Truck, FolderLock, Users, LogOut, ScanLine, Route, Calculator, Briefcase, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function Layout({ children }) {
@@ -38,14 +38,24 @@ export function Layout({ children }) {
               </div>
             </div>
           </div>
-          <button
-            data-testid="logout-button"
-            onClick={() => { logout(); nav("/login"); }}
-            className="p-2 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-            aria-label="Log out"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              data-testid="assistant-open-button"
+              onClick={() => nav("/assistant")}
+              className="p-2 rounded-md text-amber-500 hover:bg-slate-800 transition-colors"
+              aria-label="AI Assistant"
+            >
+              <Sparkles className="w-5 h-5" />
+            </button>
+            <button
+              data-testid="logout-button"
+              onClick={() => { logout(); nav("/login"); }}
+              className="p-2 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+              aria-label="Log out"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         <main className="px-4 pt-4">{children}</main>
