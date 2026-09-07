@@ -405,6 +405,7 @@ class RateInput(BaseModel):
     def_price: float = 3.50
     wear_per_mile: float = 0.18
     quoted_rate: Optional[float] = None
+    dispatcher_fee_percent: Optional[float] = 0
 
 
 class SecurementInput(BaseModel):
@@ -621,11 +622,44 @@ async def rate(data: RateInput, user: dict = Depends(require_owner)):
         "quoted_rate": data.quoted_rate,
     }
     if data.quoted_rate is not None:
-        profit = data.quoted_rate - total_cost
+        pct = data.dispatcher_fee_percent or 0
+        dispatcher_fee = data.quoted_rate * pct / 100
+        net_rate = data.quoted_rate - dispatcher_fee
+        take_home = net_rate - total_cost
         result["rate_per_mile"] = round(data.quoted_rate / data.distance_miles, 2)
-        result["profit"] = round(profit, 2)
-        result["margin_pct"] = round((profit / data.quoted_rate * 100), 1) if data.quoted_rate else 0
+        result["dispatcher_fee_percent"] = pct
+        result["dispatcher_fee"] = round(dispatcher_fee, 2)
+        result["net_rate"] = round(net_rate, 2)
+        result["take_home"] = round(take_home, 2)
+        result["take_home_margin_pct"] = round((take_home / data.quoted_rate * 100), 1) if data.quoted_rate else 0
+        result["profit"] = round(take_home, 2)
+        result["margin_pct"] = result["take_home_margin_pct"]
     return result
+
+
+class DispatcherInput(BaseModel):
+    name: str
+    fee_percent: float
+
+
+@api_router.get("/dispatchers")
+async def list_dispatchers(user: dict = Depends(require_owner)):
+    return await db.dispatchers.find({}, {"_id": 0}).to_list(200)
+
+
+@api_router.post("/dispatchers")
+async def create_dispatcher(data: DispatcherInput, user: dict = Depends(require_owner)):
+    doc = {"id": str(uuid.uuid4()), "name": data.name, "fee_percent": data.fee_percent,
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.dispatchers.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/dispatchers/{dispatcher_id}")
+async def delete_dispatcher(dispatcher_id: str, user: dict = Depends(require_owner)):
+    await db.dispatchers.delete_one({"id": dispatcher_id})
+    return {"ok": True}
 
 
 @api_router.post("/securement")

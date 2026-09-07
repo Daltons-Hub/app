@@ -6,7 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select";
 import {
-  Scale, DollarSign, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ShieldCheck, Truck,
+  Scale, DollarSign, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ShieldCheck, Truck, Trash2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -139,7 +139,31 @@ function Compliance() {
 function Rate() {
   const [f, setF] = useState({ distance_miles: "", cargo_weight: "", fuel_price: "4.00", mpg: "10", quoted_rate: "" });
   const [res, setRes] = useState(null);
+  const [dispatchers, setDispatchers] = useState([]);
+  const [dispatcherId, setDispatcherId] = useState("none");
+  const [newDisp, setNewDisp] = useState({ name: "", fee_percent: "" });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
+  const loadDispatchers = () => api.get("/dispatchers").then((r) => setDispatchers(r.data)).catch(() => {});
+  useEffect(() => { loadDispatchers(); }, []);
+
+  const selectedFee = dispatcherId === "none" ? 0 : (dispatchers.find((d) => d.id === dispatcherId)?.fee_percent || 0);
+
+  const addDispatcher = async () => {
+    if (!newDisp.name.trim() || newDisp.fee_percent === "") return toast.error("Enter a dispatcher name and fee %.");
+    try {
+      await api.post("/dispatchers", { name: newDisp.name.trim(), fee_percent: Number(newDisp.fee_percent) });
+      setNewDisp({ name: "", fee_percent: "" });
+      loadDispatchers();
+      toast.success("Dispatcher saved.");
+    } catch (e) { toast.error(apiError(e)); }
+  };
+
+  const removeDispatcher = async (id) => {
+    await api.delete(`/dispatchers/${id}`);
+    if (dispatcherId === id) setDispatcherId("none");
+    loadDispatchers();
+  };
 
   const run = async () => {
     if (!f.distance_miles || !f.fuel_price) return toast.error("Enter distance and fuel price.");
@@ -148,6 +172,7 @@ function Rate() {
         distance_miles: Number(f.distance_miles), cargo_weight: f.cargo_weight ? Number(f.cargo_weight) : null,
         fuel_price: Number(f.fuel_price), mpg: Number(f.mpg) || 10,
         quoted_rate: f.quoted_rate ? Number(f.quoted_rate) : null,
+        dispatcher_fee_percent: selectedFee,
       });
       setRes(data);
     } catch (e) { toast.error(apiError(e)); }
@@ -155,14 +180,23 @@ function Rate() {
 
   return (
     <div className="space-y-4">
-      <p className="text-slate-400 text-sm">See your real cost to run a load and whether the quoted rate leaves a profit.</p>
+      <p className="text-slate-400 text-sm">See your real cost to run a load and your take-home after the dispatcher's cut.</p>
       <div className="grid grid-cols-2 gap-3">
         <FieldWrap label="Distance (mi)"><NumInput data-testid="rate-distance-input" value={f.distance_miles} onChange={set("distance_miles")} placeholder="450" /></FieldWrap>
         <FieldWrap label="Cargo (lb)"><NumInput value={f.cargo_weight} onChange={set("cargo_weight")} placeholder="12000" /></FieldWrap>
         <FieldWrap label="Fuel $/gal"><NumInput data-testid="rate-fuel-input" value={f.fuel_price} onChange={set("fuel_price")} /></FieldWrap>
-        <FieldWrap label="MPG"><NumInput value={f.mpg} onChange={set("mpg")} /></FieldWrap>
+        <FieldWrap label="MPG"><NumInput data-testid="rate-mpg-input" value={f.mpg} onChange={set("mpg")} /></FieldWrap>
       </div>
       <FieldWrap label="Quoted Rate ($ total, optional)"><NumInput data-testid="rate-quote-input" value={f.quoted_rate} onChange={set("quoted_rate")} placeholder="1350" /></FieldWrap>
+      <FieldWrap label="Dispatcher">
+        <Select value={dispatcherId} onValueChange={setDispatcherId}>
+          <SelectTrigger data-testid="rate-dispatcher-select" className="h-12 bg-slate-800/60 border-slate-700 text-slate-100"><SelectValue /></SelectTrigger>
+          <SelectContent className="bg-[#161920] border-slate-700 text-slate-100">
+            <SelectItem value="none">None (no dispatcher)</SelectItem>
+            {dispatchers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} — {d.fee_percent}%</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </FieldWrap>
       <RunBtn onClick={run} testId="rate-run-button">Calculate</RunBtn>
 
       {res && (
@@ -177,16 +211,41 @@ function Rate() {
             <div className="flex justify-between"><span className="text-slate-400">Total cost to run</span><span className="font-mono-num font-bold text-xl">${res.total_cost}</span></div>
           </div>
           {res.quoted_rate != null && (
-            <div className={`rounded-xl border p-4 ${res.profit >= 0 ? "border-emerald-500/50 bg-emerald-500/10" : "border-red-500/50 bg-red-500/10"}`} data-testid="rate-margin">
-              <div className="flex justify-between text-sm"><span className="text-slate-300">Quoted</span><span className="font-mono-num">${res.quoted_rate} ( ${res.rate_per_mile}/mi )</span></div>
-              <div className="flex justify-between items-center mt-2">
-                <span className="font-display font-bold text-lg">{res.profit >= 0 ? "PROFIT" : "LOSS"}</span>
-                <span className={`font-mono-num font-black text-2xl ${res.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>${res.profit} · {res.margin_pct}%</span>
+            <div className={`rounded-xl border p-4 ${res.take_home >= 0 ? "border-emerald-500/50 bg-emerald-500/10" : "border-red-500/50 bg-red-500/10"}`} data-testid="rate-margin">
+              <div className="flex justify-between text-sm"><span className="text-slate-300">Gross quoted</span><span className="font-mono-num">${res.quoted_rate} ( ${res.rate_per_mile}/mi )</span></div>
+              {res.dispatcher_fee_percent > 0 && (
+                <>
+                  <div className="flex justify-between text-sm mt-1" data-testid="rate-dispatcher-fee"><span className="text-slate-300">Dispatcher fee ({res.dispatcher_fee_percent}%)</span><span className="font-mono-num text-red-400">− ${res.dispatcher_fee}</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className="text-slate-300">Net rate</span><span className="font-mono-num">${res.net_rate}</span></div>
+                </>
+              )}
+              <div className="flex justify-between text-sm mt-1"><span className="text-slate-300">Less running cost</span><span className="font-mono-num text-red-400">− ${res.total_cost}</span></div>
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-700">
+                <span className="font-display font-bold text-lg">{res.take_home >= 0 ? "TAKE-HOME" : "LOSS"}</span>
+                <span data-testid="rate-take-home" className={`font-mono-num font-black text-2xl ${res.take_home >= 0 ? "text-emerald-400" : "text-red-400"}`}>${res.take_home} · {res.take_home_margin_pct}%</span>
               </div>
             </div>
           )}
         </div>
       )}
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+        <div className="text-xs font-mono-num uppercase tracking-widest text-slate-400">Your Dispatchers</div>
+        {dispatchers.length === 0 && <div className="text-slate-500 text-sm">No dispatchers yet. Add one below.</div>}
+        {dispatchers.map((d, i) => (
+          <div key={d.id} data-testid={`dispatcher-row-${i}`} className="flex items-center justify-between">
+            <span className="text-slate-200 text-sm">{d.name} — <span className="font-mono-num">{d.fee_percent}%</span></span>
+            <button data-testid={`dispatcher-delete-${i}`} onClick={() => removeDispatcher(d.id)} className="p-2 text-red-400"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ))}
+        <div className="flex gap-2">
+          <input data-testid="dispatcher-name-input" value={newDisp.name} onChange={(e) => setNewDisp({ ...newDisp, name: e.target.value })} placeholder="Dispatcher name"
+            className="flex-1 h-11 rounded-lg bg-slate-800/60 border border-slate-700 px-3 text-slate-100 outline-none focus:border-amber-500" />
+          <input data-testid="dispatcher-fee-input" type="number" inputMode="decimal" value={newDisp.fee_percent} onChange={(e) => setNewDisp({ ...newDisp, fee_percent: e.target.value })} placeholder="%"
+            className="w-20 h-11 rounded-lg bg-slate-800/60 border border-slate-700 px-3 text-slate-100 outline-none focus:border-amber-500" />
+          <button data-testid="dispatcher-add-button" onClick={addDispatcher} className="px-4 h-11 rounded-lg bg-amber-500 text-[#0A0C0E] font-bold flex items-center justify-center"><Plus className="w-5 h-5" /></button>
+        </div>
+      </div>
     </div>
   );
 }
