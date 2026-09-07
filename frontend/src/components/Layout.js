@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Truck, FolderLock, ScrollText, Users, LogOut, ScanLine } from "lucide-react";
+import { Home, Truck, FolderLock, Users, LogOut, ScanLine, Route, Calculator } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function Layout({ children }) {
@@ -7,12 +7,20 @@ export function Layout({ children }) {
   const loc = useLocation();
   const { user, logout, isOwner } = useAuth();
 
-  const items = [
-    { to: "/", icon: Home, label: "Home", testId: "nav-home" },
-    { to: "/rigs", icon: Truck, label: "Rigs", testId: "nav-rigs" },
-    { to: "/documents", icon: FolderLock, label: "Docs", testId: "nav-documents" },
-    ...(isOwner ? [{ to: "/drivers", icon: Users, label: "Drivers", testId: "nav-drivers" }] : []),
-  ];
+  const items = isOwner
+    ? [
+        { to: "/", icon: Home, label: "Home", testId: "nav-home" },
+        { to: "/rigs", icon: Truck, label: "Rigs", testId: "nav-rigs" },
+        { to: "/trip", icon: Route, label: "Trip", testId: "nav-trip" },
+        { to: "/tools", icon: Calculator, label: "Tools", testId: "nav-tools" },
+        { to: "/documents", icon: FolderLock, label: "Docs", testId: "nav-documents" },
+      ]
+    : [
+        { to: "/", icon: Home, label: "Home", testId: "nav-home" },
+        { to: "/trip", icon: Route, label: "Trip", testId: "nav-trip" },
+        { to: "/tools", icon: Calculator, label: "Tools", testId: "nav-tools" },
+        { to: "/documents", icon: FolderLock, label: "Docs", testId: "nav-documents" },
+      ];
 
   return (
     <div className="min-h-screen bg-[#0A0C0E] flex justify-center">
@@ -55,7 +63,7 @@ export function Layout({ children }) {
 
         {/* bottom nav */}
         <nav className="fixed bottom-0 left-0 right-0 z-30 flex justify-center bg-[#0F1115] border-t border-slate-800/60">
-          <div className="w-full max-w-md grid grid-cols-4 h-20">
+          <div className="w-full max-w-md grid h-20" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0,1fr))` }}>
             {items.map((it) => {
               const active = loc.pathname === it.to;
               const Icon = it.icon;
@@ -73,7 +81,6 @@ export function Layout({ children }) {
                 </button>
               );
             })}
-            {items.length === 3 && <div />}
           </div>
         </nav>
       </div>

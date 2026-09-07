@@ -26,14 +26,15 @@ Phase 1 Core → Phase 2 Trip logic → Phase 3 Back office → Phase 4 AI Assis
 - Drivers management (owner): create driver login, assign rig.
 
 ## Backlog (prioritized)
-### Phase 2 — Trip logic (P0, next)
-- Load Compliance Calculator (10,001 lb & 26,001 lb GCWR thresholds → CDL/DOT/ELD/consortium).
-- Load Rate Calculator (fuel cost, DEF, wear, cost-per-mile vs quoted rate).
-- Load Securement Checklist (auto tie-down/chain list by cargo weight/type).
-- Trip logging (start/stop, duty status, mileage by state).
-### Phase 3 — Back office (P1)
-- Delivery/POD (photo + signature → invoice), Maintenance Tracker, Expense tracking + IFTA report.
-### Phase 4 — AI Assistant (P2, only if credits remain)
+### Phase 2 — Trip logic ✅ (2026-06, tested 11/11 + 16/16 Phase 1 regression)
+- Load Compliance Calculator: cargo + rig → FMCSA requirements (USDOT, medical, HOS/ELD, CDL Class A/B, drug & alcohol consortium) using max(GCWR rating, actual loaded weight) against 10,001 & 26,001 lb thresholds; rating-gotcha note + overweight warnings.
+- Load Rate Calculator (owner-only): fuel/DEF/wear, cost-per-mile, profit & margin vs quoted rate.
+- Load Securement Checklist: chains vs straps, 50% aggregate-WLL rule, length-based min tie-down count, editable pre-trip checklist.
+- Trip logging: start/stop, duty status, mileage by state, total miles, trip history.
+- Active-rig picker (owner) powers Weigh Station; sample data (Big Blue rig + 5 docs + demo driver assigned) via one-time seed flag.
+### Phase 3 — Back office (P0, next)
+- Delivery/POD (photo + signature → invoice), Maintenance Tracker (per-truck schedule tied to mileage w/ due alerts), Expense tracking + IFTA mileage-by-state report.
+### Phase 4 — AI Assistant (P1, only if credits remain)
 - Gemini 3 Flash chat over stored app data.
 
 ## Notes / Known minor items

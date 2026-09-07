@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Truck, FolderLock, ScanLine, ArrowRight, CheckCircle2, AlertTriangle, XCircle, Info } from "lucide-react";
+import { Truck, FolderLock, ScanLine, ArrowRight, CheckCircle2, AlertTriangle, XCircle, Info, Route, Scale, DollarSign, ClipboardCheck, Users } from "lucide-react";
 
 const LEVELS = {
   good: { cls: "border-emerald-500/50 bg-emerald-500/10", Icon: CheckCircle2, color: "text-emerald-400" },
@@ -15,9 +15,11 @@ export default function Dashboard() {
   const nav = useNavigate();
   const { user, isOwner } = useAuth();
   const [data, setData] = useState(null);
+  const [trip, setTrip] = useState(null);
 
   useEffect(() => {
     api.get("/dashboard").then((r) => setData(r.data)).catch(() => {});
+    api.get("/trips/active").then((r) => setTrip(r.data?.id ? r.data : null)).catch(() => {});
   }, []);
 
   if (!data) return <div className="text-slate-500 py-20 text-center">Loading…</div>;
@@ -65,6 +67,42 @@ export default function Dashboard() {
         </div>
       </button>
 
+      {trip && (
+        <button data-testid="dashboard-active-trip" onClick={() => nav("/trip")}
+          className="w-full rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-4 flex items-center gap-3 active:scale-[0.99] transition-transform">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <div className="text-left flex-1">
+            <div className="font-display font-bold text-lg leading-tight">Trip in progress</div>
+            <div className="text-slate-300 text-sm">{trip.rig_name || "Active trip"} · tap to manage</div>
+          </div>
+          <Route className="w-5 h-5 text-emerald-400" />
+        </button>
+      )}
+
+      {/* Tools quick actions */}
+      <div>
+        <div className="text-xs font-mono-num uppercase tracking-widest text-slate-400 mb-2">Quick tools</div>
+        <div className="grid grid-cols-3 gap-3">
+          <QuickTool icon={Scale} label="Compliance" onClick={() => nav("/tools?tab=compliance")} testId="quick-compliance" />
+          {isOwner
+            ? <QuickTool icon={DollarSign} label="Rate" onClick={() => nav("/tools?tab=rate")} testId="quick-rate" />
+            : <QuickTool icon={Route} label="Trip" onClick={() => nav("/trip")} testId="quick-trip" />}
+          <QuickTool icon={ClipboardCheck} label="Securement" onClick={() => nav("/tools?tab=securement")} testId="quick-securement" />
+        </div>
+      </div>
+
+      {isOwner && (
+        <button data-testid="manage-drivers-card" onClick={() => nav("/drivers")}
+          className="w-full rounded-xl border border-slate-800 bg-slate-900/40 p-4 flex items-center gap-3 active:bg-slate-800/60 transition-colors">
+          <Users className="w-6 h-6 text-amber-500" />
+          <div className="text-left flex-1">
+            <div className="font-semibold">Manage Drivers</div>
+            <div className="text-slate-400 text-sm">{data.driver_count} driver(s) · assign rigs</div>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400" />
+        </button>
+      )}
+
       {/* Quick stats */}
       <div className="grid grid-cols-2 gap-3">
         <Stat icon={Truck} label={isOwner ? "Rigs" : "My Rig"} value={data.rig_count} onClick={() => nav("/rigs")} testId="stat-rigs" />
@@ -100,6 +138,16 @@ function Stat({ icon: Icon, label, value, onClick, testId }) {
       <Icon className="w-5 h-5 text-amber-500 mb-2" />
       <div className="font-display font-black text-3xl leading-none">{value}</div>
       <div className="text-xs text-slate-400 mt-1 uppercase tracking-wide">{label}</div>
+    </button>
+  );
+}
+
+function QuickTool({ icon: Icon, label, onClick, testId }) {
+  return (
+    <button data-testid={testId} onClick={onClick}
+      className="rounded-xl border border-slate-800 bg-slate-900/40 p-3 flex flex-col items-center gap-1.5 active:bg-slate-800/60 transition-colors">
+      <Icon className="w-6 h-6 text-amber-500" />
+      <span className="text-xs font-semibold text-slate-200">{label}</span>
     </button>
   );
 }

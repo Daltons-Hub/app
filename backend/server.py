@@ -16,6 +16,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 import requests
+import math
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -293,12 +294,7 @@ async def weigh_station(user: dict = Depends(get_current_user)):
         return {"present": True, "number": d.get("number"), "status": doc_status(d.get("expiration_date")),
                 "expiration_date": d.get("expiration_date"), "file_id": d.get("file_id")}
 
-    if user["role"] == "owner":
-        rig = await db.rigs.find_one({}, {"_id": 0})
-    elif user.get("assigned_rig_id"):
-        rig = await db.rigs.find_one({"id": user["assigned_rig_id"]}, {"_id": 0})
-    else:
-        rig = None
+    rig = await resolve_user_rig(user)
 
     return {"dot": summarize("DOT"), "mc": summarize("MC"), "insurance": summarize("Insurance"),
             "ifta": summarize("IFTA"), "medical": summarize("Medical"), "rig": rig}
@@ -352,7 +348,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
     if user["role"] == "owner":
         rig_count = await db.rigs.count_documents({})
         driver_count = await db.users.count_documents({"role": "driver"})
-        my_rig = await db.rigs.find_one({}, {"_id": 0})
+        my_rig = await resolve_user_rig(user)
     else:
         rig_count = 1 if user.get("assigned_rig_id") else 0
         driver_count = 0
@@ -375,6 +371,330 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "doc_count": len(docs), "rig_count": rig_count, "driver_count": driver_count, "my_rig": my_rig}
 
 
+# ===================== Phase 2: Trip logic =====================
+
+class ComplianceInput(BaseModel):
+    rig_id: str
+    cargo_weight: float
+
+
+class RateInput(BaseModel):
+    distance_miles: float
+    cargo_weight: Optional[float] = None
+    fuel_price: float
+    mpg: float = 10.0
+    def_price: float = 3.50
+    wear_per_mile: float = 0.18
+    quoted_rate: Optional[float] = None
+
+
+class SecurementInput(BaseModel):
+    cargo_weight: float
+    cargo_type: str
+    length_ft: Optional[float] = None
+
+
+class TripStart(BaseModel):
+    rig_id: Optional[str] = None
+    start_odometer: Optional[float] = None
+    origin: Optional[str] = None
+
+
+class DutyUpdate(BaseModel):
+    duty_status: str
+
+
+class StateMilesInput(BaseModel):
+    state: str
+    miles: float
+
+
+class TripStop(BaseModel):
+    end_odometer: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class ActiveRigInput(BaseModel):
+    rig_id: Optional[str] = None
+
+
+async def resolve_user_rig(user):
+    if user["role"] == "owner":
+        if user.get("active_rig_id"):
+            r = await db.rigs.find_one({"id": user["active_rig_id"]}, {"_id": 0})
+            if r:
+                return r
+        return await db.rigs.find_one({}, {"_id": 0})
+    if user.get("assigned_rig_id"):
+        return await db.rigs.find_one({"id": user["assigned_rig_id"]}, {"_id": 0})
+    return None
+
+
+def compute_compliance(rig, cargo_weight):
+    empty = rig.get("empty_weight") or 0
+    gcwr = rig.get("gcwr") or 0
+    gvwr = rig.get("gvwr") or 0
+    trailer_capacity = rig.get("trailer_capacity") or 0
+
+    actual_loaded = empty + cargo_weight  # truck empty + cargo (trailer tare not tracked)
+    # FMCSA looks at GVWR/GCWR rating OR actual weight, whichever is greater.
+    determining = max(gcwr, actual_loaded)
+
+    is_cmv = determining >= 10001
+
+    # Is the trailer over 10,000 lb? Needed to distinguish Class A from Class B.
+    trailer_over_10k = trailer_capacity >= 10001 or (gcwr and gvwr and (gcwr - gvwr) > 10000)
+
+    cdl_required = determining >= 26001
+    cdl_class = None
+    if cdl_required:
+        cdl_class = "A" if trailer_over_10k else "B"
+
+    consortium_required = cdl_required  # DOT random drug & alcohol program is tied to CDL operation
+    dot_number_required = is_cmv
+    medical_card_required = is_cmv
+    eld_required = is_cmv
+
+    rating_gotcha = gcwr >= 26001 and actual_loaded < 26001
+
+    requirements = [
+        {"key": "usdot", "label": "USDOT Number", "required": dot_number_required,
+         "detail": "Interstate for-hire operation of a 10,001 lb+ vehicle needs an active USDOT number." if dot_number_required
+         else "Under 10,001 lb — a USDOT number is generally not federally required."},
+        {"key": "medical", "label": "DOT Medical Card", "required": medical_card_required,
+         "detail": "Driver must carry a valid DOT medical examiner's certificate." if medical_card_required
+         else "No federal DOT physical required at this weight."},
+        {"key": "hos_eld", "label": "Hours of Service / ELD", "required": eld_required,
+         "detail": "Must track Hours of Service. An ELD is required unless you qualify for the 150 air-mile short-haul exemption (return within 14 hours)." if eld_required
+         else "Federal Hours-of-Service / ELD rules do not apply at this weight."},
+        {"key": "cdl", "label": f"Commercial Driver's License (Class {cdl_class})" if cdl_class else "Commercial Driver's License", "required": cdl_required,
+         "detail": (f"Combined weight is 26,001 lb+ and the trailer is over 10,000 lb → a Class A CDL is required." if cdl_class == "A"
+                    else "Combined weight is 26,001 lb+ → at least a Class B CDL is required.") if cdl_required
+         else "Under 26,001 lb — no CDL required (unless hauling hazmat or passengers)."},
+        {"key": "consortium", "label": "Drug & Alcohol Consortium", "required": consortium_required,
+         "detail": "CDL drivers must be enrolled in a DOT random drug & alcohol testing program (consortium)." if consortium_required
+         else "Not federally required for non-CDL drivers."},
+    ]
+
+    warnings = []
+    if gcwr and actual_loaded > gcwr:
+        warnings.append(f"Estimated loaded weight ({int(actual_loaded):,} lb) exceeds your GCWR rating ({int(gcwr):,} lb). You may be overweight.")
+    if trailer_capacity and cargo_weight > trailer_capacity:
+        warnings.append(f"Cargo ({int(cargo_weight):,} lb) is over the trailer's rated capacity ({int(trailer_capacity):,} lb).")
+
+    if not is_cmv:
+        tier = "Light / non-CMV"
+        summary = "This load is under 10,001 lb — outside most federal FMCSA requirements."
+    elif not cdl_required:
+        tier = "CMV — no CDL"
+        summary = "This load makes you a commercial motor vehicle (USDOT, medical card, and HOS apply), but no CDL is required."
+    else:
+        tier = f"CDL Class {cdl_class} required"
+        summary = f"This combination requires a Class {cdl_class} CDL, plus USDOT, medical card, HOS/ELD, and a drug & alcohol consortium."
+
+    if rating_gotcha:
+        summary += f" Note: even though your actual load is under 26,001 lb, your rig's GCWR rating of {int(gcwr):,} lb sets the requirement — FMCSA uses the rating."
+
+    return {
+        "cargo_weight": cargo_weight,
+        "empty_weight": empty,
+        "actual_loaded": actual_loaded,
+        "gcwr": gcwr,
+        "determining_weight": determining,
+        "tier": tier,
+        "is_cmv": is_cmv,
+        "cdl_required": cdl_required,
+        "cdl_class": cdl_class,
+        "eld_required": eld_required,
+        "consortium_required": consortium_required,
+        "rating_gotcha": rating_gotcha,
+        "summary": summary,
+        "requirements": requirements,
+        "warnings": warnings,
+    }
+
+
+CHECKLIST_BASE = [
+    "Inspect every strap / chain for cuts, wear, or damage before use",
+    "Confirm working load limit (WLL) tags are legible on each device",
+    "Block or brace cargo against forward movement (headboard / bulkhead)",
+    "Apply tie-downs at proper angles and remove all slack",
+    "Re-check tension within the first 50 miles, then periodically",
+    "Flag or mark any legal overhang before departure",
+]
+
+CHECKLIST_TYPE = {
+    "General Freight": ["Fill voids with dunnage so cargo can't shift"],
+    "Steel / Metal": ["Use chains with grab hooks", "Add dunnage between stacks to stop side-to-side shift"],
+    "Machinery / Equipment": ["Secure at manufacturer tie-down points", "Chock wheels/tracks, engage parking brake & any transport locks"],
+    "Lumber": ["Strap each tier separately", "Use corner protectors on all edges"],
+    "Vehicles / Autos": ["Use 4 wheel-basket or over-the-tire straps per vehicle", "Chock wheels and set parking brake"],
+    "Pipe": ["Block and brace against rolling with stakes/bolsters", "Chain each tier separately"],
+}
+
+
+def compute_securement(cargo_weight, cargo_type, length_ft):
+    required_wll = round(cargo_weight * 0.5)
+    use_chains = cargo_type in ("Steel / Metal", "Machinery / Equipment", "Pipe")
+    device = "3/8\" Grade 70 chain w/ binder" if use_chains else "4\" ratchet strap"
+    device_wll = 6600 if use_chains else 5400
+
+    count_by_wll = max(2, math.ceil(required_wll / device_wll)) if device_wll else 2
+    min_by_length = 2
+    if length_ft:
+        if length_ft <= 5 and cargo_weight <= 1100:
+            min_by_length = 1
+        elif length_ft <= 10:
+            min_by_length = 2
+        else:
+            min_by_length = 2 + math.ceil((length_ft - 10) / 10)
+    count = max(count_by_wll, min_by_length)
+
+    items = list(CHECKLIST_BASE)
+    if use_chains:
+        items.insert(4, "Confirm load binders are locked and secured so they can't release")
+    else:
+        items.insert(4, "Use edge protectors wherever straps cross sharp corners")
+    items += CHECKLIST_TYPE.get(cargo_type, [])
+
+    return {
+        "cargo_weight": cargo_weight,
+        "cargo_type": cargo_type,
+        "required_wll": required_wll,
+        "device": device,
+        "device_wll": device_wll,
+        "count": count,
+        "aggregate_wll": count * device_wll,
+        "note": f"Federal rule: total tie-down WLL must be at least 50% of cargo weight ({required_wll:,} lb). {count} × {device} ({device_wll:,} lb each) = {count * device_wll:,} lb.",
+        "checklist": items,
+    }
+
+
+@api_router.post("/compliance")
+async def compliance(data: ComplianceInput, user: dict = Depends(get_current_user)):
+    rig = await db.rigs.find_one({"id": data.rig_id}, {"_id": 0})
+    if not rig:
+        raise HTTPException(status_code=404, detail="Rig not found")
+    return compute_compliance(rig, data.cargo_weight)
+
+
+@api_router.post("/rate")
+async def rate(data: RateInput, user: dict = Depends(require_owner)):
+    if data.distance_miles <= 0 or data.mpg <= 0:
+        raise HTTPException(status_code=400, detail="Distance and MPG must be greater than zero.")
+    gallons = data.distance_miles / data.mpg
+    fuel_cost = gallons * data.fuel_price
+    def_gallons = gallons * 0.03
+    def_cost = def_gallons * data.def_price
+    wear_cost = data.distance_miles * data.wear_per_mile
+    total_cost = fuel_cost + def_cost + wear_cost
+    cost_per_mile = total_cost / data.distance_miles
+
+    result = {
+        "gallons": round(gallons, 1),
+        "fuel_cost": round(fuel_cost, 2),
+        "def_cost": round(def_cost, 2),
+        "wear_cost": round(wear_cost, 2),
+        "total_cost": round(total_cost, 2),
+        "cost_per_mile": round(cost_per_mile, 2),
+        "quoted_rate": data.quoted_rate,
+    }
+    if data.quoted_rate is not None:
+        profit = data.quoted_rate - total_cost
+        result["rate_per_mile"] = round(data.quoted_rate / data.distance_miles, 2)
+        result["profit"] = round(profit, 2)
+        result["margin_pct"] = round((profit / data.quoted_rate * 100), 1) if data.quoted_rate else 0
+    return result
+
+
+@api_router.post("/securement")
+async def securement(data: SecurementInput, user: dict = Depends(get_current_user)):
+    return compute_securement(data.cargo_weight, data.cargo_type, data.length_ft)
+
+
+@api_router.post("/trips/start")
+async def start_trip(data: TripStart, user: dict = Depends(get_current_user)):
+    if await db.trips.find_one({"user_id": user["id"], "status": "active"}):
+        raise HTTPException(status_code=400, detail="You already have an active trip. Stop it first.")
+    rig_id = data.rig_id or user.get("assigned_rig_id") or user.get("active_rig_id")
+    rig = await db.rigs.find_one({"id": rig_id}, {"_id": 0}) if rig_id else None
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "user_name": user.get("name"),
+           "rig_id": rig_id, "rig_name": rig.get("name") if rig else None,
+           "status": "active", "start_time": now, "end_time": None,
+           "start_odometer": data.start_odometer, "end_odometer": None, "total_miles": None,
+           "duty_status": "driving", "duty_log": [{"status": "driving", "time": now}],
+           "state_miles": [], "origin": data.origin, "notes": None, "created_at": now}
+    await db.trips.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/trips/active")
+async def active_trip(user: dict = Depends(get_current_user)):
+    return await db.trips.find_one({"user_id": user["id"], "status": "active"}, {"_id": 0}) or {}
+
+
+async def _get_owned_trip(trip_id, user):
+    t = await db.trips.find_one({"id": trip_id})
+    if not t:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if t["user_id"] != user["id"] and user["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Not your trip.")
+    return t
+
+
+@api_router.post("/trips/{trip_id}/duty")
+async def trip_duty(trip_id: str, data: DutyUpdate, user: dict = Depends(get_current_user)):
+    await _get_owned_trip(trip_id, user)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.trips.update_one({"id": trip_id},
+                              {"$set": {"duty_status": data.duty_status},
+                               "$push": {"duty_log": {"status": data.duty_status, "time": now}}})
+    return await db.trips.find_one({"id": trip_id}, {"_id": 0})
+
+
+@api_router.post("/trips/{trip_id}/state-miles")
+async def trip_state_miles(trip_id: str, data: StateMilesInput, user: dict = Depends(get_current_user)):
+    t = await _get_owned_trip(trip_id, user)
+    sm = t.get("state_miles", [])
+    for e in sm:
+        if e["state"] == data.state:
+            e["miles"] = (e.get("miles") or 0) + data.miles
+            break
+    else:
+        sm.append({"state": data.state, "miles": data.miles})
+    await db.trips.update_one({"id": trip_id}, {"$set": {"state_miles": sm}})
+    return await db.trips.find_one({"id": trip_id}, {"_id": 0})
+
+
+@api_router.post("/trips/{trip_id}/stop")
+async def stop_trip(trip_id: str, data: TripStop, user: dict = Depends(get_current_user)):
+    t = await _get_owned_trip(trip_id, user)
+    now = datetime.now(timezone.utc).isoformat()
+    total = None
+    if data.end_odometer is not None and t.get("start_odometer") is not None:
+        total = data.end_odometer - t["start_odometer"]
+    await db.trips.update_one({"id": trip_id},
+                              {"$set": {"status": "completed", "end_time": now, "end_odometer": data.end_odometer,
+                                        "total_miles": total, "duty_status": "off_duty", "notes": data.notes}})
+    return await db.trips.find_one({"id": trip_id}, {"_id": 0})
+
+
+@api_router.get("/trips")
+async def list_trips(user: dict = Depends(get_current_user)):
+    q = {} if user["role"] == "owner" else {"user_id": user["id"]}
+    trips = await db.trips.find(q, {"_id": 0}).to_list(500)
+    trips.sort(key=lambda t: t.get("created_at") or "", reverse=True)
+    return trips
+
+
+@api_router.put("/settings/active-rig")
+async def set_active_rig(data: ActiveRigInput, user: dict = Depends(require_owner)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"active_rig_id": data.rig_id}})
+    return {"active_rig_id": data.rig_id}
+
+
 async def seed():
     await db.users.create_index("username", unique=True)
     owner_username = os.environ.get("ADMIN_USERNAME", "owner").lower()
@@ -389,6 +709,37 @@ async def seed():
         await db.users.insert_one({"id": str(uuid.uuid4()), "name": "Demo Driver", "username": "driver",
                                    "pin_hash": hash_pin("1234"), "role": "driver", "email": "",
                                    "assigned_rig_id": None, "created_at": datetime.now(timezone.utc).isoformat()})
+
+    # Sample data so the app is populated on first login (runs once, ever)
+    if not await db.app_meta.find_one({"key": "sample_seeded"}):
+        today = datetime.now(timezone.utc).date()
+
+        def d(days):
+            return (today + timedelta(days=days)).isoformat()
+
+        rig_id = str(uuid.uuid4())
+        await db.rigs.insert_one({
+            "id": rig_id, "name": "Big Blue", "truck_make_model": "Ram 3500 Dually",
+            "engine": "6.7L Cummins", "empty_weight": 8200, "front_axle_weight": 5000,
+            "rear_axle_weight": 6000, "gvwr": 14000, "gcwr": 37000,
+            "trailer_type": "40ft Gooseneck Flatbed", "trailer_length": 40, "trailer_capacity": 21000,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.users.update_one({"username": "driver"}, {"$set": {"assigned_rig_id": rig_id}})
+        await db.users.update_one({"username": os.environ.get("ADMIN_USERNAME", "owner").lower()},
+                                  {"$set": {"active_rig_id": rig_id}})
+
+        samples = [
+            {"category": "DOT", "label": "USDOT Registration", "number": "3948217", "expiration_date": d(500)},
+            {"category": "MC", "label": "MC Operating Authority", "number": "1029384", "expiration_date": d(500)},
+            {"category": "Insurance", "label": "Progressive Liability Cert", "number": None, "expiration_date": d(18)},
+            {"category": "IFTA", "label": "IFTA License", "number": None, "expiration_date": d(320)},
+            {"category": "Medical", "label": "DOT Medical Card", "number": None, "expiration_date": d(210)},
+        ]
+        for s in samples:
+            await db.documents.insert_one({"id": str(uuid.uuid4()), "issue_date": None, "file_id": None,
+                                           "created_at": datetime.now(timezone.utc).isoformat(), **s})
+        await db.app_meta.insert_one({"key": "sample_seeded", "at": datetime.now(timezone.utc).isoformat()})
 
 
 @app.on_event("startup")

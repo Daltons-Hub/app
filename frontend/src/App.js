@@ -9,6 +9,8 @@ import Rigs from "@/pages/Rigs";
 import Documents from "@/pages/Documents";
 import WeighStation from "@/pages/WeighStation";
 import Drivers from "@/pages/Drivers";
+import Tools from "@/pages/Tools";
+import Trip from "@/pages/Trip";
 
 function Protected({ children, ownerOnly }) {
   const { user, loading, isOwner } = useAuth();
@@ -32,6 +34,8 @@ function App() {
             <Route path="/" element={<Protected><Shell><Dashboard /></Shell></Protected>} />
             <Route path="/rigs" element={<Protected><Shell><Rigs /></Shell></Protected>} />
             <Route path="/documents" element={<Protected><Shell><Documents /></Shell></Protected>} />
+            <Route path="/tools" element={<Protected><Shell><Tools /></Shell></Protected>} />
+            <Route path="/trip" element={<Protected><Shell><Trip /></Shell></Protected>} />
             <Route path="/drivers" element={<Protected ownerOnly><Shell><Drivers /></Shell></Protected>} />
             <Route path="/weigh-station" element={<Protected><WeighStation /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />

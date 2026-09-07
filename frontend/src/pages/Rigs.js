@@ -21,7 +21,16 @@ export default function Rigs() {
   const [form, setForm] = useState(EMPTY);
   const [editId, setEditId] = useState(null);
 
-  const load = () => api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
+  const [activeRigId, setActiveRigId] = useState(null);
+  const load = () => {
+    api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
+    if (isOwner) api.get("/auth/me").then((r) => setActiveRigId(r.data.active_rig_id)).catch(() => {});
+  };
+  const setActive = async (id) => {
+    await api.put("/settings/active-rig", { rig_id: id });
+    setActiveRigId(id);
+    toast.success("Set as active rig for Weigh Station.");
+  };
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setForm(EMPTY); setEditId(null); setOpen(true); };
@@ -100,6 +109,14 @@ export default function Rigs() {
             <Spec icon={Weight} label="Front Axle" value={fmt(r.front_axle_weight)} />
             <Spec icon={Weight} label="Rear Axle" value={fmt(r.rear_axle_weight)} />
           </div>
+          {isOwner && (
+            <button data-testid={`set-active-rig-${i}`} onClick={() => setActive(r.id)}
+              className={`mt-3 w-full h-11 rounded-lg font-semibold text-sm transition-colors ${
+                activeRigId === r.id ? "bg-amber-500 text-[#0A0C0E]" : "bg-slate-800/60 text-slate-300"
+              }`}>
+              {activeRigId === r.id ? "★ Active for Weigh Station" : "Set as active rig"}
+            </button>
+          )}
         </div>
       ))}
 
