@@ -20,7 +20,6 @@ import math
 import json
 import re
 from pymongo import ReturnDocument
-from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
