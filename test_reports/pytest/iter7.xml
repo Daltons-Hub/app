@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="70" time="56.311" timestamp="2026-09-24T00:07:20.743319+00:00" hostname="agent-env-551f57fd-ed2d-445c-9775-8e80df8ff5e2"><testcase classname="tests.test_phase4" name="test_history_empty_after_clear_owner" time="0.785" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[GET-/deliveries-None]" time="0.772" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[POST-/deliveries-body1]" time="0.165" /><testcase classname="tests.test_phase4" name="test_history_requires_auth" time="0.154" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[GET-/maintenance-None]" time="0.152" /><testcase classname="tests.test_phase4" name="test_owner_weigh_station_clearance" time="2.902" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[POST-/maintenance-body3]" time="0.155" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[GET-/expenses-None]" time="0.299" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[POST-/expenses-body5]" time="0.163" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[GET-/ifta-report-None]" time="0.131" /><testcase classname="tests.test_phase3.TestDriverForbidden" name="test_driver_403[GET-/office/summary-None]" time="0.145" /><testcase classname="tests.test_dispatchers" name="test_driver_forbidden_list" time="0.539" /><testcase classname="tests.test_dispatchers" name="test_driver_forbidden_create" time="0.125" /><testcase classname="tests.test_dispatchers" name="test_create_three_dispatchers" time="1.041" /><testcase classname="tests.test_dispatchers" name="test_list_dispatchers_contains_created" time="0.140" /><testcase classname="tests.test_dispatchers" name="test_rate_with_dispatcher_10pct" time="0.135" /><testcase classname="tests.test_phase4" name="test_owner_unpaid_returns_dollar_amount" time="1.877" /><testcase classname="tests.test_dispatchers" name="test_rate_without_dispatcher" time="0.174" /><testcase classname="tests.test_dispatchers" name="test_delete_dispatchers" time="0.599" /><testcase classname="tests.test_cookie_auth.TestCookieAuth" name="test_login_sets_httponly_cookie" time="0.385" /><testcase classname="tests.test_cookie_auth.TestCookieAuth" name="test_me_via_cookie_only" time="0.495" /><testcase classname="tests.test_cookie_auth.TestCookieAuth" name="test_me_no_auth_401" time="0.187" /><testcase classname="tests.test_phase4" name="test_owner_history_persists_after_chat" time="0.130" /><testcase classname="tests.test_cookie_auth.TestCookieAuth" name="test_me_bearer_fallback_still_works" time="0.531" /><testcase classname="tests.test_phase4" name="test_owner_clear_history" time="0.548" /><testcase classname="tests.test_cookie_auth.TestCookieAuth" name="test_logout_clears_cookie" time="0.671" /><testcase classname="tests.test_phase4" name="test_driver_financial_refusal_no_dollar" time="2.816" /><testcase classname="tests.test_cookie_auth.TestCookieAuth" name="test_file_download_auth_via_cookie" time="1.415" /><testcase classname="tests.test_cookie_auth.TestNoUndefinedVars" name="test_dashboard_always_has_next_step" time="0.423" /><testcase classname="tests.test_cookie_auth.TestNoUndefinedVars" name="test_compliance_returns_tier_and_summary[5000]" time="0.133" /><testcase classname="tests.test_cookie_auth.TestNoUndefinedVars" name="test_compliance_returns_tier_and_summary[12000]" time="0.153" /><testcase classname="tests.test_cookie_auth.TestNoUndefinedVars" name="test_compliance_returns_tier_and_summary[25000]" time="0.189" /><testcase classname="tests.test_phase4" name="test_driver_non_financial_answer_works" time="1.933" /><testcase classname="tests.test_cookie_auth.TestNoUndefinedVars" name="test_assistant_chat_returns_answer" time="2.279" /><testcase classname="tests.test_phase4" name="test_driver_history_persists" time="0.154" /><testcase classname="tests.test_phase4" name="test_driver_clear" time="0.148" /><testcase classname="tests.test_phase4" name="test_driver_403_on_office_summary" time="0.147" /><testcase classname="tests.backend_test.TestAuth" name="test_owner_login" time="0.561" /><testcase classname="tests.backend_test.TestAuth" name="test_driver_login" time="0.392" /><testcase classname="tests.test_phase2.TestCompliance" name="test_big_blue_12000_lb_class_a_rating_gotcha" time="0.969" /><testcase classname="tests.backend_test.TestAuth" name="test_wrong_pin" time="0.374" /><testcase classname="tests.test_phase2.TestCompliance" name="test_overweight_warning" time="0.141" /><testcase classname="tests.backend_test.TestAuth" name="test_me_requires_auth" time="0.224" /><testcase classname="tests.test_phase2.TestCompliance" name="test_driver_can_run_compliance" time="0.608" /><testcase classname="tests.backend_test.TestRigs" name="test_owner_rig_crud" time="1.483" /><testcase classname="tests.backend_test.TestDocuments" name="test_document_status_badges" time="1.410" /><testcase classname="tests.backend_test.TestRigs" name="test_driver_cannot_create_rig" time="0.576" /><testcase classname="tests.backend_test.TestDocuments" name="test_driver_cannot_create_document" time="0.656" /><testcase classname="tests.backend_test.TestFiles" name="test_upload_and_download" time="0.686" /><testcase classname="tests.backend_test.TestDrivers" name="test_driver_forbidden_from_drivers_list" time="0.182" /><testcase classname="tests.backend_test.TestDrivers" name="test_owner_creates_and_assigns_driver" time="2.119" /><testcase classname="tests.backend_test.TestFiles" name="test_files_require_auth" time="0.129" /><testcase classname="tests.backend_test.TestDashboard" name="test_dashboard_returns_next_step" time="0.252" /><testcase classname="tests.backend_test.TestDashboard" name="test_driver_dashboard" time="0.155" /><testcase classname="tests.test_phase2.TestActiveRig" name="test_owner_set_active_rig" time="0.871" /><testcase classname="tests.test_phase2.TestActiveRig" name="test_driver_cannot_set_active_rig" time="0.719" /><testcase classname="tests.test_phase2.TestSampleData" name="test_sample_docs_present" time="0.129" /><testcase classname="tests.test_phase2.TestRate" name="test_owner_rate_math" time="0.482" /><testcase classname="tests.test_phase2.TestSampleData" name="test_driver_assigned_to_big_blue" time="0.157" /><testcase classname="tests.backend_test.TestWeighStation" name="test_weigh_station_shape" time="0.225" /><testcase classname="tests.test_phase2.TestRate" name="test_driver_rate_forbidden" time="0.504" /><testcase classname="tests.backend_test.TestRoleEnforcement" name="test_driver_rigs_scope" time="0.144" /><testcase classname="tests.test_cookie_auth.TestRoleGate" name="test_driver_403_office" time="2.709" /><testcase classname="tests.test_phase3.TestMaintenance" name="test_odometer_and_status_flow" time="2.044" /><testcase classname="tests.test_phase3.TestMaintenance" name="test_trip_stop_bumps_rig_odometer" time="1.289" /><testcase classname="tests.test_phase2.TestSecurement" name="test_steel_chains_recommendation" time="0.454" /><testcase classname="tests.test_phase2.TestTrips" name="test_full_trip_flow" time="30.546"><failure message="requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='weigh-go-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)">/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:534: in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:571: in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:1443: in getresponse
+    response.begin()
+/usr/local/lib/python3.11/http/client.py:337: in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/http/client.py:298: in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/socket.py:718: in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/ssl.py:1314: in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/ssl.py:1166: in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:696: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:842: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:498: in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/util/util.py:39: in reraise
+    raise value
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:788: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:536: in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:367: in _raise_timeout
+    raise ReadTimeoutError(
+E   urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='weigh-go-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_phase2.py:112: in test_full_trip_flow
+    act = requests.get(f"{API}/trips/active", headers=h(driver_token), timeout=30).json()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:87: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:71: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:651: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:784: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:742: in send
+    raise ReadTimeout(e, request=request)
+E   requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='weigh-go-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)</failure></testcase><testcase classname="tests.test_phase3.TestDeliveries" name="test_create_delivery_creates_invoice_and_persists" time="31.307"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:1116: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_phase3.py:48: in test_create_delivery_creates_invoice_and_persists
+    photo = requests.post(f"{API}/upload", files=files, headers=h(owner_token), timeout=60).json()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:1120: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="tests.test_phase3.TestOfficeSummary" name="test_office_summary_shape" time="0.196" /><testcase classname="tests.test_phase3.TestExpenses" name="test_fuel_and_toll_and_ifta_aggregation" time="3.192" /></testsuite></testsuites>

@@ -42,6 +42,15 @@ Phase 1 Core → Phase 2 Trip logic → Phase 3 Back office → Phase 4 AI Assis
 - Role-aware: driver never receives financial data — enforced in context (financials excluded), system prompt, AND a server-side dollar-figure strip on driver replies. Verified refusal.
 - Persistent per-user history (db.assistant_messages), clear button, suggested-question chips. Entry via header Sparkles + dashboard card; reachable by both roles.
 
+## Code-Quality Refactor ✅ (2026-06, regression-tested 70/70 backend + full frontend, iteration_7.json)
+Refactor-only pass (no new features, no behavior change), scope confirmed with user (P0+P1+small P2; big component extraction intentionally skipped):
+- Backend `server.py`: `compute_compliance()` split into `_compliance_requirements` / `_compliance_warnings` / `_compliance_tier`; `build_assistant_context()` split into `_summarize_credentials` / `_summarize_trips` / `_summarize_maintenance` / `_summarize_financials`. Identical outputs.
+- Frontend hook deps: data-load fns wrapped in `useCallback` (Trip, Rigs, Maintenance, Expenses, Drivers, Documents, Deliveries, Tools) with effects depending on them; `Trip.js` completed-trips list memoized via `useMemo`.
+- Stable React keys replacing array-index keys in `Tools.js` (warnings, securement checklist), `Assistant.js` (suggestions), `Login.js` (keypad).
+- Test-file literal-comparison cleanup in `tests/test_phase2.py`.
+- NOTE: server.py `is not None` checks (report lines 624/731/736/815/867) were left unchanged — they are the correct Python idiom; `== None` would be a lint regression. Component extraction (P2) deferred per user.
+
 ## Notes / Known minor items
 - Owner weigh-station currently uses first rig (no active-rig selector yet).
 - Optional a11y: add DialogDescription to modals.
+- Deferred (P2, user-approved skip): extract sub-components from large pages (Deliveries/Documents/Expenses/Maintenance/Rigs).
