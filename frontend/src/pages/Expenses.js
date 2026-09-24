@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, apiError } from "../lib/api";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -27,12 +27,12 @@ export default function Expenses() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ category: "Fuel", amount: "", gallons: "", state: "TX", rig_id: "", vendor: "", date: "", notes: "" });
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/expenses").then((r) => setItems(r.data)).catch(() => {});
     api.get("/ifta-report").then((r) => setIfta(r.data)).catch(() => {});
     api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openNew = () => {
     setForm({ category: "Fuel", amount: "", gallons: "", state: "TX", rig_id: rigs[0]?.id || "", vendor: "", date: new Date().toISOString().slice(0, 10), notes: "" });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, apiError } from "../lib/api";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -25,11 +25,11 @@ export default function Maintenance() {
   const [odoVal, setOdoVal] = useState("");
   const [form, setForm] = useState({ rig_id: "", type: "Oil Change", interval_miles: "", interval_days: "", last_done_miles: "", last_done_date: "" });
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/maintenance").then((r) => setItems(r.data)).catch(() => {});
     api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openNew = () => {
     setForm({ rig_id: rigs[0]?.id || "", type: "Oil Change", interval_miles: "5000", interval_days: "", last_done_miles: "", last_done_date: new Date().toISOString().slice(0, 10) });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, apiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -22,16 +22,16 @@ export default function Rigs() {
   const [editId, setEditId] = useState(null);
 
   const [activeRigId, setActiveRigId] = useState(null);
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
     if (isOwner) api.get("/auth/me").then((r) => setActiveRigId(r.data.active_rig_id)).catch(() => {});
-  };
+  }, [isOwner]);
   const setActive = async (id) => {
     await api.put("/settings/active-rig", { rig_id: id });
     setActiveRigId(id);
     toast.success("Set as active rig for Weigh Station.");
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openNew = () => { setForm(EMPTY); setEditId(null); setOpen(true); };
   const openEdit = (r) => {

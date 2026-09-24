@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { api, apiError } from "../lib/api";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -22,7 +22,7 @@ export default function Trip() {
   const [smForm, setSmForm] = useState({ state: "TX", miles: "" });
   const [endOdo, setEndOdo] = useState("");
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/trips/active").then((r) => setTrip(r.data?.id ? r.data : null)).catch(() => {});
     api.get("/trips").then((r) => setHistory(r.data)).catch(() => {});
     Promise.all([api.get("/rigs"), api.get("/auth/me")]).then(([rr, me]) => {
@@ -31,8 +31,10 @@ export default function Trip() {
       const found = rr.data.find((x) => x.id === pref);
       setStartForm((s) => ({ ...s, rig_id: found ? found.id : (rr.data[0]?.id || "") }));
     }).catch(() => {});
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const completedTrips = useMemo(() => history.filter((t) => t.status === "completed"), [history]);
 
   const start = async () => {
     try {
@@ -146,11 +148,11 @@ export default function Trip() {
 
       <div className="pt-2">
         <div className="text-xs font-mono-num uppercase tracking-widest text-slate-400 mb-2">Recent Trips</div>
-        {history.filter((t) => t.status === "completed").length === 0 && (
+        {completedTrips.length === 0 && (
           <div className="text-slate-500 text-sm">No completed trips yet.</div>
         )}
         <div className="space-y-2">
-          {history.filter((t) => t.status === "completed").map((t, i) => (
+          {completedTrips.map((t, i) => (
             <div key={t.id} data-testid={`trip-history-${i}`} className="rounded-xl border border-slate-800 bg-slate-900/40 p-3 flex justify-between items-center">
               <div>
                 <div className="font-semibold">{t.rig_name || "Trip"}{t.origin ? ` · ${t.origin}` : ""}</div>

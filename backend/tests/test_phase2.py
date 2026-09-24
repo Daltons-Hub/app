@@ -43,11 +43,11 @@ class TestCompliance:
                           headers=h(owner_token), timeout=30)
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["cdl_required"] is True
+        assert d["cdl_required"] == True
         assert d["cdl_class"] == "A"
-        assert d["consortium_required"] is True
-        assert d["rating_gotcha"] is True
-        assert d["is_cmv"] is True
+        assert d["consortium_required"] == True
+        assert d["rating_gotcha"] == True
+        assert d["is_cmv"] == True
         # Requirements array shape
         keys = {req["key"] for req in d["requirements"]}
         assert {"usdot", "medical", "hos_eld", "cdl", "consortium"} <= keys

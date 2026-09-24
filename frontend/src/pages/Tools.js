@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, apiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -111,7 +111,7 @@ function Compliance() {
           </div>
 
           {res.warnings.map((w, i) => (
-            <div key={i} data-testid={`compliance-warning-${i}`} className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-red-300 text-sm">
+            <div key={w} data-testid={`compliance-warning-${i}`} className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-red-300 text-sm">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {w}
             </div>
           ))}
@@ -144,8 +144,8 @@ function Rate() {
   const [newDisp, setNewDisp] = useState({ name: "", fee_percent: "" });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
-  const loadDispatchers = () => api.get("/dispatchers").then((r) => setDispatchers(r.data)).catch(() => {});
-  useEffect(() => { loadDispatchers(); }, []);
+  const loadDispatchers = useCallback(() => api.get("/dispatchers").then((r) => setDispatchers(r.data)).catch(() => {}), []);
+  useEffect(() => { loadDispatchers(); }, [loadDispatchers]);
 
   const selectedFee = dispatcherId === "none" ? 0 : (dispatchers.find((d) => d.id === dispatcherId)?.fee_percent || 0);
 
@@ -299,7 +299,7 @@ function Securement() {
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/40 divide-y divide-slate-800">
             {res.checklist.map((item, i) => (
-              <button key={i} data-testid={`securement-item-${i}`} onClick={() => setChecked({ ...checked, [i]: !checked[i] })}
+              <button key={item} data-testid={`securement-item-${i}`} onClick={() => setChecked({ ...checked, [i]: !checked[i] })}
                 className="w-full flex items-start gap-3 p-3 text-left">
                 <span className={`mt-0.5 w-6 h-6 rounded-md border flex items-center justify-center shrink-0 ${checked[i] ? "bg-amber-500 border-amber-500" : "border-slate-600"}`}>
                   {checked[i] && <CheckCircle2 className="w-4 h-4 text-[#0A0C0E]" />}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, apiError } from "../lib/api";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -15,11 +15,11 @@ export default function Drivers() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", username: "", pin: "", assigned_rig_id: "" });
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/drivers").then((r) => setDrivers(r.data)).catch(() => {});
     api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const save = async () => {
     if (!form.name.trim() || !form.username.trim()) return toast.error("Enter a name and username.");

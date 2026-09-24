@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { api, apiError, fileUrl } from "../lib/api";
 import { SignaturePad } from "../components/SignaturePad";
 import {
@@ -23,11 +23,11 @@ export default function Deliveries() {
   const [invoice, setInvoice] = useState(null);
   const sigRef = useRef(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/deliveries").then((r) => setItems(r.data)).catch(() => {});
     api.get("/rigs").then((r) => setRigs(r.data)).catch(() => {});
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openNew = () => {
     setForm({ ...EMPTY, delivery_date: new Date().toISOString().slice(0, 10) });

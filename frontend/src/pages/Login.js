@@ -73,10 +73,10 @@ export default function Login() {
         <div className="grid grid-cols-3 gap-3 mt-2">
           {keys.map((k, i) =>
             k === "" ? (
-              <div key={i} />
+              <div key={`spacer-${i}`} />
             ) : k === "del" ? (
               <button
-                key={i}
+                key="del"
                 data-testid="login-pin-delete"
                 onClick={() => setPin(pin.slice(0, -1))}
                 className="h-16 rounded-xl bg-slate-800/40 flex items-center justify-center text-slate-300 active:bg-slate-700 transition-colors"
@@ -85,7 +85,7 @@ export default function Login() {
               </button>
             ) : (
               <button
-                key={i}
+                key={k}
                 data-testid={`login-key-${k}`}
                 onClick={() => press(k)}
                 className="h-16 rounded-xl bg-slate-800/60 text-2xl font-display font-bold text-slate-100 active:bg-amber-500 active:text-[#0A0C0E] transition-colors"

@@ -449,6 +449,46 @@ async def resolve_user_rig(user):
     return None
 
 
+def _compliance_requirements(dot_number_required, medical_card_required, eld_required,
+                             cdl_required, cdl_class, consortium_required):
+    return [
+        {"key": "usdot", "label": "USDOT Number", "required": dot_number_required,
+         "detail": "Interstate for-hire operation of a 10,001 lb+ vehicle needs an active USDOT number." if dot_number_required
+         else "Under 10,001 lb — a USDOT number is generally not federally required."},
+        {"key": "medical", "label": "DOT Medical Card", "required": medical_card_required,
+         "detail": "Driver must carry a valid DOT medical examiner's certificate." if medical_card_required
+         else "No federal DOT physical required at this weight."},
+        {"key": "hos_eld", "label": "Hours of Service / ELD", "required": eld_required,
+         "detail": "Must track Hours of Service. An ELD is required unless you qualify for the 150 air-mile short-haul exemption (return within 14 hours)." if eld_required
+         else "Federal Hours-of-Service / ELD rules do not apply at this weight."},
+        {"key": "cdl", "label": f"Commercial Driver's License (Class {cdl_class})" if cdl_class else "Commercial Driver's License", "required": cdl_required,
+         "detail": (f"Combined weight is 26,001 lb+ and the trailer is over 10,000 lb → a Class A CDL is required." if cdl_class == "A"
+                    else "Combined weight is 26,001 lb+ → at least a Class B CDL is required.") if cdl_required
+         else "Under 26,001 lb — no CDL required (unless hauling hazmat or passengers)."},
+        {"key": "consortium", "label": "Drug & Alcohol Consortium", "required": consortium_required,
+         "detail": "CDL drivers must be enrolled in a DOT random drug & alcohol testing program (consortium)." if consortium_required
+         else "Not federally required for non-CDL drivers."},
+    ]
+
+
+def _compliance_warnings(gcwr, actual_loaded, trailer_capacity, cargo_weight):
+    warnings = []
+    if gcwr and actual_loaded > gcwr:
+        warnings.append(f"Estimated loaded weight ({int(actual_loaded):,} lb) exceeds your GCWR rating ({int(gcwr):,} lb). You may be overweight.")
+    if trailer_capacity and cargo_weight > trailer_capacity:
+        warnings.append(f"Cargo ({int(cargo_weight):,} lb) is over the trailer's rated capacity ({int(trailer_capacity):,} lb).")
+    return warnings
+
+
+def _compliance_tier(is_cmv, cdl_required, cdl_class):
+    if not is_cmv:
+        return "Light / non-CMV", "This load is under 10,001 lb — outside most federal FMCSA requirements."
+    if not cdl_required:
+        return "CMV — no CDL", "This load makes you a commercial motor vehicle (USDOT, medical card, and HOS apply), but no CDL is required."
+    return (f"CDL Class {cdl_class} required",
+            f"This combination requires a Class {cdl_class} CDL, plus USDOT, medical card, HOS/ELD, and a drug & alcohol consortium.")
+
+
 def compute_compliance(rig, cargo_weight):
     empty = rig.get("empty_weight") or 0
     gcwr = rig.get("gcwr") or 0
@@ -476,42 +516,12 @@ def compute_compliance(rig, cargo_weight):
 
     rating_gotcha = gcwr >= 26001 and actual_loaded < 26001
 
-    requirements = [
-        {"key": "usdot", "label": "USDOT Number", "required": dot_number_required,
-         "detail": "Interstate for-hire operation of a 10,001 lb+ vehicle needs an active USDOT number." if dot_number_required
-         else "Under 10,001 lb — a USDOT number is generally not federally required."},
-        {"key": "medical", "label": "DOT Medical Card", "required": medical_card_required,
-         "detail": "Driver must carry a valid DOT medical examiner's certificate." if medical_card_required
-         else "No federal DOT physical required at this weight."},
-        {"key": "hos_eld", "label": "Hours of Service / ELD", "required": eld_required,
-         "detail": "Must track Hours of Service. An ELD is required unless you qualify for the 150 air-mile short-haul exemption (return within 14 hours)." if eld_required
-         else "Federal Hours-of-Service / ELD rules do not apply at this weight."},
-        {"key": "cdl", "label": f"Commercial Driver's License (Class {cdl_class})" if cdl_class else "Commercial Driver's License", "required": cdl_required,
-         "detail": (f"Combined weight is 26,001 lb+ and the trailer is over 10,000 lb → a Class A CDL is required." if cdl_class == "A"
-                    else "Combined weight is 26,001 lb+ → at least a Class B CDL is required.") if cdl_required
-         else "Under 26,001 lb — no CDL required (unless hauling hazmat or passengers)."},
-        {"key": "consortium", "label": "Drug & Alcohol Consortium", "required": consortium_required,
-         "detail": "CDL drivers must be enrolled in a DOT random drug & alcohol testing program (consortium)." if consortium_required
-         else "Not federally required for non-CDL drivers."},
-    ]
-
-    warnings = []
-    if gcwr and actual_loaded > gcwr:
-        warnings.append(f"Estimated loaded weight ({int(actual_loaded):,} lb) exceeds your GCWR rating ({int(gcwr):,} lb). You may be overweight.")
-    if trailer_capacity and cargo_weight > trailer_capacity:
-        warnings.append(f"Cargo ({int(cargo_weight):,} lb) is over the trailer's rated capacity ({int(trailer_capacity):,} lb).")
-
-    tier = ""
-    summary = ""
-    if not is_cmv:
-        tier = "Light / non-CMV"
-        summary = "This load is under 10,001 lb — outside most federal FMCSA requirements."
-    elif not cdl_required:
-        tier = "CMV — no CDL"
-        summary = "This load makes you a commercial motor vehicle (USDOT, medical card, and HOS apply), but no CDL is required."
-    else:
-        tier = f"CDL Class {cdl_class} required"
-        summary = f"This combination requires a Class {cdl_class} CDL, plus USDOT, medical card, HOS/ELD, and a drug & alcohol consortium."
+    requirements = _compliance_requirements(
+        dot_number_required, medical_card_required, eld_required,
+        cdl_required, cdl_class, consortium_required,
+    )
+    warnings = _compliance_warnings(gcwr, actual_loaded, trailer_capacity, cargo_weight)
+    tier, summary = _compliance_tier(is_cmv, cdl_required, cdl_class)
 
     if rating_gotcha:
         summary += f" Note: even though your actual load is under 26,001 lb, your rig's GCWR rating of {int(gcwr):,} lb sets the requirement — FMCSA uses the rating."
@@ -1025,6 +1035,49 @@ class AssistantInput(BaseModel):
     message: str
 
 
+def _summarize_credentials(docs):
+    return [{"category": d.get("category"), "label": d.get("label"), "number": d.get("number"),
+             "expiration_date": d.get("expiration_date"), "status": doc_status(d.get("expiration_date"))}
+            for d in docs]
+
+
+def _summarize_trips(trips):
+    active = [t for t in trips if t.get("status") == "active"]
+    completed = sorted([t for t in trips if t.get("status") == "completed"],
+                       key=lambda x: x.get("created_at") or "", reverse=True)[:5]
+    active_trip = ({"rig_name": active[0].get("rig_name"), "duty_status": active[0].get("duty_status"),
+                    "origin": active[0].get("origin"), "state_miles": active[0].get("state_miles")}
+                   if active else None)
+    recent_trips = [{"rig_name": t.get("rig_name"), "start_time": t.get("start_time"),
+                     "total_miles": t.get("total_miles"), "state_miles": t.get("state_miles")} for t in completed]
+    return active_trip, recent_trips
+
+
+def _summarize_maintenance(maint, rigmap):
+    out = []
+    for it in maint:
+        odo = (rigmap.get(it["rig_id"], {}).get("current_odometer")) or 0
+        cm = compute_maint(it, odo)
+        out.append({"type": it.get("type"), "rig": rigmap.get(it["rig_id"], {}).get("name"),
+                    "status": cm["status"], "next_due_miles": cm["next_due_miles"],
+                    "miles_remaining": cm["miles_remaining"], "next_due_date": cm["next_due_date"],
+                    "current_odometer": odo})
+    return out
+
+
+def _summarize_financials(deliveries, expenses):
+    deliveries.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    unpaid = [d for d in deliveries if d.get("invoice_status") != "paid"]
+    return {
+        "unpaid_invoice_count": len(unpaid),
+        "unpaid_total": round(sum((d.get("rate_amount") or 0) for d in unpaid), 2),
+        "recent_invoices": [{"invoice_number": d.get("invoice_number"), "customer": d.get("customer_name"),
+                             "amount": d.get("rate_amount"), "status": d.get("invoice_status")} for d in deliveries[:8]],
+        "expense_total": round(sum((x.get("amount") or 0) for x in expenses), 2),
+        "note": "Per-load margin is not stored. To estimate margin, use cost = fuel + DEF (~3% of fuel) + wear (~$0.18/mi); ask the user for distance, fuel price and MPG if needed.",
+    }
+
+
 async def build_assistant_context(user):
     is_owner = user["role"] == "owner"
     ctx = {
@@ -1040,45 +1093,20 @@ async def build_assistant_context(user):
     ctx["rigs"] = rigs
 
     docs = await db.documents.find({}, {"_id": 0}).to_list(1000)
-    ctx["credentials"] = [{"category": d.get("category"), "label": d.get("label"), "number": d.get("number"),
-                           "expiration_date": d.get("expiration_date"), "status": doc_status(d.get("expiration_date"))}
-                          for d in docs]
+    ctx["credentials"] = _summarize_credentials(docs)
 
     tq = {} if is_owner else {"user_id": user["id"]}
     trips = await db.trips.find(tq, {"_id": 0}).to_list(300)
-    active = [t for t in trips if t.get("status") == "active"]
-    completed = sorted([t for t in trips if t.get("status") == "completed"],
-                       key=lambda x: x.get("created_at") or "", reverse=True)[:5]
-    ctx["active_trip"] = ({"rig_name": active[0].get("rig_name"), "duty_status": active[0].get("duty_status"),
-                           "origin": active[0].get("origin"), "state_miles": active[0].get("state_miles")}
-                          if active else None)
-    ctx["recent_trips"] = [{"rig_name": t.get("rig_name"), "start_time": t.get("start_time"),
-                            "total_miles": t.get("total_miles"), "state_miles": t.get("state_miles")} for t in completed]
+    ctx["active_trip"], ctx["recent_trips"] = _summarize_trips(trips)
 
     rigmap = {r["id"]: r for r in rigs}
     maint = await db.maintenance.find({"rig_id": {"$in": list(rigmap.keys())}}, {"_id": 0}).to_list(500) if rigmap else []
-    ctx["maintenance"] = []
-    for it in maint:
-        odo = (rigmap.get(it["rig_id"], {}).get("current_odometer")) or 0
-        cm = compute_maint(it, odo)
-        ctx["maintenance"].append({"type": it.get("type"), "rig": rigmap.get(it["rig_id"], {}).get("name"),
-                                   "status": cm["status"], "next_due_miles": cm["next_due_miles"],
-                                   "miles_remaining": cm["miles_remaining"], "next_due_date": cm["next_due_date"],
-                                   "current_odometer": odo})
+    ctx["maintenance"] = _summarize_maintenance(maint, rigmap)
 
     if is_owner:
         deliveries = await db.deliveries.find({}, {"_id": 0}).to_list(500)
-        deliveries.sort(key=lambda x: x.get("created_at") or "", reverse=True)
-        unpaid = [d for d in deliveries if d.get("invoice_status") != "paid"]
         expenses = await db.expenses.find({}, {"_id": 0}).to_list(1000)
-        ctx["financials"] = {
-            "unpaid_invoice_count": len(unpaid),
-            "unpaid_total": round(sum((d.get("rate_amount") or 0) for d in unpaid), 2),
-            "recent_invoices": [{"invoice_number": d.get("invoice_number"), "customer": d.get("customer_name"),
-                                 "amount": d.get("rate_amount"), "status": d.get("invoice_status")} for d in deliveries[:8]],
-            "expense_total": round(sum((x.get("amount") or 0) for x in expenses), 2),
-            "note": "Per-load margin is not stored. To estimate margin, use cost = fuel + DEF (~3% of fuel) + wear (~$0.18/mi); ask the user for distance, fuel price and MPG if needed.",
-        }
+        ctx["financials"] = _summarize_financials(deliveries, expenses)
     return ctx
 
 

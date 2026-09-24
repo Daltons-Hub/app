@@ -75,7 +75,7 @@ export default function Assistant() {
           {messages.length === 0 && (
             <div className="flex gap-2 overflow-x-auto no-scrollbar mb-2">
               {suggestions.map((s, i) => (
-                <button key={i} data-testid={`assistant-suggest-${i}`} onClick={() => send(s)}
+                <button key={s} data-testid={`assistant-suggest-${i}`} onClick={() => send(s)}
                   className="shrink-0 px-3 h-9 rounded-full bg-slate-800/80 border border-slate-700 text-slate-200 text-xs">{s}</button>
               ))}
             </div>

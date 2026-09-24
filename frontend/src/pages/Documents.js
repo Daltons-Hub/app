@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, apiError, fileUrl } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge } from "../components/StatusBadge";
@@ -22,8 +22,8 @@ export default function Documents() {
   const [uploading, setUploading] = useState(false);
   const [tab, setTab] = useState("All");
 
-  const load = () => api.get("/documents").then((r) => setDocs(r.data)).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/documents").then((r) => setDocs(r.data)).catch(() => {}), []);
+  useEffect(() => { load(); }, [load]);
 
   const openNew = () => { setForm(EMPTY); setEditId(null); setUploadName(""); setOpen(true); };
   const openEdit = (d) => {
